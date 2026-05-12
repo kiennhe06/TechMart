@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
@@ -17,7 +18,9 @@ import androidx.navigation.compose.rememberNavController
 import fpl.ph60001.techmart.auth.ui.LoginScreen
 import fpl.ph60001.techmart.auth.ui.RegisterScreen
 import fpl.ph60001.techmart.auth.ui.SplashScreen
+import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.ui.theme.TechMartTheme
+import fpl.ph60001.techmart.utils.PreferenceManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +43,7 @@ class MainActivity : ComponentActivity() {
 fun TechMartApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val preferenceManager = remember { PreferenceManager(context) }
 
     NavHost(
         navController = navController,
@@ -47,16 +51,26 @@ fun TechMartApp() {
     ) {
         composable("splash") {
             SplashScreen(onTimeout = {
-                navController.navigate("login") {
-                    popUpTo("splash") { inclusive = true }
+                if (preferenceManager.isRemembered()) {
+                    navController.navigate("home") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                } else {
+                    navController.navigate("login") {
+                        popUpTo("splash") { inclusive = true }
+                    }
                 }
             })
         }
         composable("login") {
             LoginScreen(
-                onLoginClick = { email, password ->
+                onLoginClick = { email, password, rememberMe ->
                     if (email.isNotEmpty() && password.isNotEmpty()) {
+                        preferenceManager.saveLoginState(rememberMe, email)
                         Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
                     } else {
                         Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show()
                     }
@@ -79,6 +93,9 @@ fun TechMartApp() {
                 },
                 onBackToLoginClick = { navController.popBackStack() }
             )
+        }
+        composable("home") {
+            HomeScreen()
         }
     }
 }

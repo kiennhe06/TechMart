@@ -1,6 +1,8 @@
 package fpl.ph60001.techmart.auth.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,25 +17,30 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fpl.ph60001.techmart.R
 import fpl.ph60001.techmart.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginClick: (String, String) -> Unit,
+    onLoginClick: (String, String, Boolean) -> Unit,
     onRegisterClick: () -> Unit,
     onForgotPasswordClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var rememberMe by remember { mutableStateOf(false) }
+    
     val scrollState = rememberScrollState()
 
     Box(
@@ -129,11 +136,27 @@ fun LoginScreen(
                 singleLine = true
             )
 
-            // Forgot Password
+            // Remember Me & Forgot Password Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = BluePrimary,
+                            uncheckedColor = TechGray,
+                            checkmarkColor = WhitePure
+                        )
+                    )
+                    Text(
+                        text = "Remember Me",
+                        style = MaterialTheme.typography.bodySmall.copy(color = TechGray)
+                    )
+                }
                 TextButton(onClick = onForgotPasswordClick) {
                     Text(
                         text = "Forgot Password?",
@@ -146,7 +169,7 @@ fun LoginScreen(
 
             // Login Button
             Button(
-                onClick = { onLoginClick(email, password) },
+                onClick = { onLoginClick(email, password, rememberMe) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -185,26 +208,19 @@ fun LoginScreen(
             // Social Buttons Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.Center
             ) {
-                OutlinedButton(
-                    onClick = { /* TODO */ },
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WhitePure),
-                    border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(brush = Brush.linearGradient(listOf(BluePrimary, CyberCyan)))
-                ) {
-                    Text("Google")
-                }
-                OutlinedButton(
-                    onClick = { /* TODO */ },
-                    modifier = Modifier.weight(1f).padding(start = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = WhitePure),
-                    border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(brush = Brush.linearGradient(listOf(BluePrimary, CyberCyan)))
-                ) {
-                    Text("Facebook")
-                }
+                // Google Button
+                SocialButton(
+                    iconRes = R.drawable.gg,
+                    onClick = { /* TODO */ }
+                )
+                Spacer(modifier = Modifier.width(24.dp))
+                // Facebook Button
+                SocialButton(
+                    iconRes = R.drawable.fb,
+                    onClick = { /* TODO */ }
+                )
             }
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -230,5 +246,24 @@ fun LoginScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SocialButton(iconRes: Int, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(TechSlate)
+            .clickable { onClick() }
+            .padding(12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
