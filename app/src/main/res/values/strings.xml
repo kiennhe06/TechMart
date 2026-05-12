@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">TechMart</string>
+    <string name="facebook_app_id">2025321574726148</string>
+    <string name="fb_login_protocol_scheme">fb2025321574726148</string>
+    <string name="facebook_client_token">be94ef58df1528bac020f8193772eb1c</string>
 </resources>

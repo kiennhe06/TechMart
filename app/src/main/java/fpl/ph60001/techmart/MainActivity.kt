@@ -1,28 +1,44 @@
 package fpl.ph60001.techmart
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.facebook.CallbackManager
+import com.facebook.FacebookCallback
+import com.facebook.FacebookException
+import com.facebook.login.LoginManager
+import com.facebook.login.LoginResult
+import com.google.firebase.auth.FacebookAuthProvider
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
+import fpl.ph60001.techmart.auth.data.GoogleAuthUiClient
 import fpl.ph60001.techmart.auth.ui.LoginScreen
 import fpl.ph60001.techmart.auth.ui.RegisterScreen
 import fpl.ph60001.techmart.auth.ui.SplashScreen
 import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.ui.theme.TechMartTheme
 import fpl.ph60001.techmart.utils.PreferenceManager
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class MainActivity : ComponentActivity() {
+    private val callbackManager = CallbackManager.Factory.create()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -32,18 +48,69 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TechMartApp()
+                    TechMartApp(callbackManager)
                 }
             }
         }
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        callbackManager.onActivityResult(requestCode, resultCode, data)
+    }
 }
 
 @Composable
-fun TechMartApp() {
+fun TechMartApp(callbackManager: CallbackManager) {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val preferenceManager = remember { PreferenceManager(context) }
+    val googleAuthUiClient = remember { GoogleAuthUiClient(context) }
+
+    // Facebook Login Logic
+    DisposableEffect(Unit) {
+        LoginManager.getInstance().registerCallback(callbackManager, object : FacebookCallback<LoginResult> {
+            override fun onSuccess(result: LoginResult) {
+                scope.launch {
+                    val credential = FacebookAuthProvider.getCredential(result.accessToken.token)
+                    Firebase.auth.signInWithCredential(credential).await()
+                    Toast.makeText(context, "Đăng nhập Facebook thành công!", Toast.LENGTH_SHORT).show()
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+            }
+            override fun onCancel() {
+                Toast.makeText(context, "Đã hủy đăng nhập Facebook", Toast.LENGTH_SHORT).show()
+            }
+            override fun onError(error: FacebookException) {
+                Toast.makeText(context, "Lỗi Facebook: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+        onDispose {
+            LoginManager.getInstance().unregisterCallback(callbackManager)
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                scope.launch {
+                    val signInResult = googleAuthUiClient.signInWithGoogle(result.data ?: return@launch)
+                    if (signInResult.isSuccess) {
+                        Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    } else {
+                        Toast.makeText(context, "Lỗi đăng nhập Google", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    )
 
     NavHost(
         navController = navController,
@@ -78,6 +145,16 @@ fun TechMartApp() {
                 onRegisterClick = { navController.navigate("register") },
                 onForgotPasswordClick = {
                     Toast.makeText(context, "Tính năng đang phát triển", Toast.LENGTH_SHORT).show()
+                },
+                onGoogleSignInClick = {
+                    launcher.launch(googleAuthUiClient.getSignInIntent())
+                },
+                onFacebookSignInClick = {
+                    LoginManager.getInstance().logInWithReadPermissions(
+                        context as androidx.activity.ComponentActivity,
+                        callbackManager,
+                        listOf("email", "public_profile")
+                    )
                 }
             )
         }

@@ -34,7 +34,9 @@ import fpl.ph60001.techmart.ui.theme.*
 fun LoginScreen(
     onLoginClick: (String, String, Boolean) -> Unit,
     onRegisterClick: () -> Unit,
-    onForgotPasswordClick: () -> Unit
+    onForgotPasswordClick: () -> Unit,
+    onGoogleSignInClick: () -> Unit,
+    onFacebookSignInClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -213,13 +215,13 @@ fun LoginScreen(
                 // Google Button
                 SocialButton(
                     iconRes = R.drawable.gg,
-                    onClick = { /* TODO */ }
+                    onClick = onGoogleSignInClick
                 )
                 Spacer(modifier = Modifier.width(24.dp))
                 // Facebook Button
                 SocialButton(
                     iconRes = R.drawable.fb,
-                    onClick = { /* TODO */ }
+                    onClick = onFacebookSignInClick
                 )
             }
 
