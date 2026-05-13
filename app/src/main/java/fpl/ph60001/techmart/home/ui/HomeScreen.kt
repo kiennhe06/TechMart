@@ -1,6 +1,7 @@
 package fpl.ph60001.techmart.home.ui
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,42 +24,75 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import fpl.ph60001.techmart.R
+import fpl.ph60001.techmart.home.viewmodel.HomeViewModel
+import fpl.ph60001.techmart.network.BannerDto
+import fpl.ph60001.techmart.network.CategoryDto
+import fpl.ph60001.techmart.network.ProductDto
 import fpl.ph60001.techmart.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onProductClick: (String) -> Unit = {},
+    onCategoryClick: (String) -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    onCartClick: () -> Unit = {},
+    homeViewModel: HomeViewModel = viewModel()
+) {
+    val homeData by homeViewModel.homeData.collectAsState()
+    val isLoading by homeViewModel.isLoading.collectAsState()
+
     Scaffold(
-        topBar = { HomeTopBar() },
+        topBar = { 
+            HomeTopBar(
+                onNotificationClick = onNotificationClick,
+                onCartClick = onCartClick
+            ) 
+        },
         containerColor = TechDark
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 24.dp)
-        ) {
-            // 1. Auto-sliding Banners
-            item { AutoSlidingBanner() }
-
-            // 2. Category Section
-            item { CategorySection() }
-
-            // 3. Flash Sale Section
-            item { FlashSaleSection() }
-
-            // 4. Featured Section Header
-            item {
-                SectionHeader(title = "Sản phẩm mới nhất", onSeeAllClick = {})
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = BluePrimary)
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 24.dp)
+            ) {
+                // 1. Auto-sliding Banners
+                homeData?.banners?.let { banners ->
+                    item { AutoSlidingBanner(banners) }
+                }
 
-            // Mock Product Grid Placeholder
-            item {
-                Spacer(modifier = Modifier.height(200.dp)) // Placeholder for product items
+                // 2. Category Section
+                homeData?.categories?.let { categories ->
+                    item { CategorySection(categories, onCategoryClick) }
+                }
+
+                // 3. Flash Sale Section
+                homeData?.flashSale?.let { products ->
+                    item { FlashSaleSection(products, onProductClick) }
+                }
+
+                // 4. Featured Section Header
+                item {
+                    SectionHeader(title = "Sản phẩm mới nhất", onSeeAllClick = { /* Điều hướng tới DS sản phẩm */ })
+                }
+
+                // Mock Product Grid Placeholder
+                item {
+                    Spacer(modifier = Modifier.height(200.dp))
+                }
             }
         }
     }
@@ -66,7 +100,10 @@ fun HomeScreen() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeTopBar() {
+fun HomeTopBar(
+    onNotificationClick: () -> Unit,
+    onCartClick: () -> Unit
+) {
     TopAppBar(
         title = {
             Column {
@@ -85,10 +122,10 @@ fun HomeTopBar() {
             }
         },
         actions = {
-            IconButton(onClick = {}) {
+            IconButton(onClick = onNotificationClick) {
                 Icon(Icons.Default.Notifications, contentDescription = null, tint = WhitePure)
             }
-            IconButton(onClick = {}) {
+            IconButton(onClick = onCartClick) {
                 Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = WhitePure)
             }
         },
@@ -100,18 +137,19 @@ fun HomeTopBar() {
 }
 
 @Composable
-fun AutoSlidingBanner() {
-    val banners = listOf(
-        "Sale tựu trường - Giảm giá Laptop tới 50%",
-        "iPhone 16 Pro Max - Sẵn hàng giá hời",
-        "Phụ kiện Gaming - Mua 1 tặng 1"
-    )
+fun AutoSlidingBanner(banners: List<BannerDto>) {
     val pagerState = rememberPagerState(pageCount = { banners.size })
 
-    // Auto-scroll logic
+    // Map string image names to drawable resources for mock demo
+    val bannerResources = mapOf(
+        "banner_laptop" to R.drawable.banner_laptop,
+        "banner_iphone" to R.drawable.banner_iphone,
+        "banner_gaming" to R.drawable.banner_gaming
+    )
+
     LaunchedEffect(key1 = pagerState.currentPage) {
         launch {
-            delay(3000)
+            delay(4000)
             val nextPage = (pagerState.currentPage + 1) % banners.size
             pagerState.animateScrollToPage(nextPage)
         }
@@ -120,35 +158,23 @@ fun AutoSlidingBanner() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
-            .padding(16.dp)
+            .height(200.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(BluePrimary, BlueSecondary)
-                )
-            ),
+            .background(TechSlate),
         contentAlignment = Alignment.Center
     ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            Column(
+            val resId = bannerResources[banners[page].imageUrl] ?: R.drawable.banner_laptop
+            Image(
+                painter = painterResource(id = resId),
+                contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = banners[page],
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        color = WhitePure,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
+                contentScale = ContentScale.Crop
+            )
         }
 
         // Pager Indicators
@@ -156,31 +182,31 @@ fun AutoSlidingBanner() {
             Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 12.dp)
+                .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             repeat(banners.size) { iteration ->
-                val color = if (pagerState.currentPage == iteration) WhitePure else WhitePure.copy(alpha = 0.5f)
+                val color = if (pagerState.currentPage == iteration) BluePrimary else WhitePure.copy(alpha = 0.5f)
                 Box(
                     modifier = Modifier
                         .padding(2.dp)
                         .clip(CircleShape)
                         .background(color)
-                        .size(if (pagerState.currentPage == iteration) 12.dp else 8.dp)
+                        .size(if (pagerState.currentPage == iteration) 10.dp else 6.dp)
                 )
             }
         }
     }
 }
 
-data class Category(val name: String, val icon: ImageVector)
-
 @Composable
-fun CategorySection() {
-    val categories = listOf(
-        Category("Điện thoại", Icons.Default.Smartphone),
-        Category("Laptop", Icons.Default.Laptop),
-        Category("Tablet", Icons.Default.TabletAndroid),
-        Category("Âm thanh", Icons.Default.Headphones),
-        Category("Phụ kiện", Icons.Default.SettingsInputHdmi)
+fun CategorySection(categories: List<CategoryDto>, onCategoryClick: (String) -> Unit) {
+    val iconMap = mapOf(
+        "Smartphone" to Icons.Default.Smartphone,
+        "Laptop" to Icons.Default.Laptop,
+        "TabletAndroid" to Icons.Default.TabletAndroid,
+        "Headphones" to Icons.Default.Headphones,
+        "SettingsInputHdmi" to Icons.Default.SettingsInputHdmi
     )
 
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
@@ -192,7 +218,7 @@ fun CategorySection() {
             items(categories) { category ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { }
+                    modifier = Modifier.clickable { onCategoryClick(category.name) }
                 ) {
                     Box(
                         modifier = Modifier
@@ -202,7 +228,7 @@ fun CategorySection() {
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = category.icon,
+                            imageVector = iconMap[category.icon] ?: Icons.Default.Devices,
                             contentDescription = null,
                             tint = BluePrimary,
                             modifier = Modifier.size(32.dp)
@@ -220,7 +246,7 @@ fun CategorySection() {
 }
 
 @Composable
-fun FlashSaleSection() {
+fun FlashSaleSection(products: List<ProductDto>, onProductClick: (String) -> Unit) {
     var timeLeft by remember { mutableStateOf(36000) } // 10 hours in seconds
 
     LaunchedEffect(key1 = true) {
@@ -272,10 +298,12 @@ fun FlashSaleSection() {
 
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Mock Flash Sale Products
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(3) {
-                FlashSaleItem()
+            items(products) { product ->
+                FlashSaleItem(
+                    product = product,
+                    onClick = { onProductClick(product.id) }
+                )
             }
         }
     }
@@ -301,12 +329,13 @@ fun CountdownBox(time: String) {
 }
 
 @Composable
-fun FlashSaleItem() {
+fun FlashSaleItem(product: ProductDto, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(140.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(TechDark)
+            .clickable(onClick = onClick)
             .padding(8.dp)
     ) {
         Box(
@@ -320,21 +349,20 @@ fun FlashSaleItem() {
             Icon(Icons.Default.Devices, contentDescription = null, tint = TechGray, modifier = Modifier.size(48.dp))
         }
         Text(
-            text = "Laptop Gaming Neo",
+            text = product.name,
             style = MaterialTheme.typography.bodyMedium.copy(color = WhitePure),
             modifier = Modifier.padding(top = 8.dp),
             maxLines = 1
         )
         Text(
-            text = "19.990.000đ",
+            text = product.price,
             style = MaterialTheme.typography.bodySmall.copy(
                 color = Color(0xFFFF4D4D),
                 fontWeight = FontWeight.Bold
             )
         )
-        // Progress bar for stock
         LinearProgressIndicator(
-            progress = 0.7f,
+            progress = { product.soldProgress },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
@@ -344,7 +372,7 @@ fun FlashSaleItem() {
             trackColor = TechSlate
         )
         Text(
-            text = "Đã bán 70%",
+            text = "Đã bán ${(product.soldProgress * 100).toInt()}%",
             style = MaterialTheme.typography.labelSmall.copy(color = TechGray, fontSize = 10.sp),
             modifier = Modifier.padding(top = 4.dp)
         )

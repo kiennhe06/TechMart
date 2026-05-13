@@ -14,8 +14,7 @@ class GoogleAuthUiClient(
 ) {
     private val auth = Firebase.auth
 
-    // TRƯỚC KHI CHẠY: Bạn cần lấy Web Client ID từ Firebase Console -> Authentication -> Sign-in method -> Google
-    private val webClientId = "YOUR_WEB_CLIENT_ID_HERE"
+    private val webClientId = "1026675836806-lcqp0kvhg26j3mmm0ihlnc5l1p9jfdnk.apps.googleusercontent.com"
 
     fun getSignInIntent(): Intent {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)

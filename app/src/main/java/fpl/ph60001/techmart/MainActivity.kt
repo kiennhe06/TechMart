@@ -10,13 +10,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.facebook.CallbackManager
 import com.facebook.FacebookCallback
@@ -31,7 +39,8 @@ import fpl.ph60001.techmart.auth.ui.LoginScreen
 import fpl.ph60001.techmart.auth.ui.RegisterScreen
 import fpl.ph60001.techmart.auth.ui.SplashScreen
 import fpl.ph60001.techmart.home.ui.HomeScreen
-import fpl.ph60001.techmart.ui.theme.TechMartTheme
+import fpl.ph60001.techmart.profile.ui.ProfileScreen
+import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -67,6 +76,9 @@ fun TechMartApp(callbackManager: CallbackManager) {
     val scope = rememberCoroutineScope()
     val preferenceManager = remember { PreferenceManager(context) }
     val googleAuthUiClient = remember { GoogleAuthUiClient(context) }
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
 
     // Facebook Login Logic
     DisposableEffect(Unit) {
@@ -112,67 +124,146 @@ fun TechMartApp(callbackManager: CallbackManager) {
         }
     )
 
-    NavHost(
-        navController = navController,
-        startDestination = "splash"
-    ) {
-        composable("splash") {
-            SplashScreen(onTimeout = {
-                if (preferenceManager.isRemembered()) {
-                    navController.navigate("home") {
-                        popUpTo("splash") { inclusive = true }
-                    }
-                } else {
-                    navController.navigate("login") {
-                        popUpTo("splash") { inclusive = true }
-                    }
-                }
-            })
-        }
-        composable("login") {
-            LoginScreen(
-                onLoginClick = { email, password, rememberMe ->
-                    if (email.isNotEmpty() && password.isNotEmpty()) {
-                        preferenceManager.saveLoginState(rememberMe, email)
-                        Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                        navController.navigate("home") {
-                            popUpTo("login") { inclusive = true }
-                        }
-                    } else {
-                        Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                onRegisterClick = { navController.navigate("register") },
-                onForgotPasswordClick = {
-                    Toast.makeText(context, "Tính năng đang phát triển", Toast.LENGTH_SHORT).show()
-                },
-                onGoogleSignInClick = {
-                    launcher.launch(googleAuthUiClient.getSignInIntent())
-                },
-                onFacebookSignInClick = {
-                    LoginManager.getInstance().logInWithReadPermissions(
-                        context as androidx.activity.ComponentActivity,
-                        callbackManager,
-                        listOf("email", "public_profile")
+    val showBottomBar = currentDestination?.route in listOf("home", "profile")
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar(
+                    containerColor = TechSlate,
+                    contentColor = WhitePure
+                ) {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        label = { Text("Trang chủ") },
+                        selected = currentDestination?.hierarchy?.any { it.route == "home" } == true,
+                        onClick = {
+                            navController.navigate("home") {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BluePrimary,
+                            selectedTextColor = BluePrimary,
+                            unselectedIconColor = TechGray,
+                            unselectedTextColor = TechGray,
+                            indicatorColor = TechDark
+                        )
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        label = { Text("Hồ sơ") },
+                        selected = currentDestination?.hierarchy?.any { it.route == "profile" } == true,
+                        onClick = {
+                            navController.navigate("profile") {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BluePrimary,
+                            selectedTextColor = BluePrimary,
+                            unselectedIconColor = TechGray,
+                            unselectedTextColor = TechGray,
+                            indicatorColor = TechDark
+                        )
                     )
                 }
-            )
+            }
         }
-        composable("register") {
-            RegisterScreen(
-                onRegisterClick = { name, email, phone, password ->
-                    if (name.isNotEmpty() && email.isNotEmpty() && phone.isNotEmpty() && password.isNotEmpty()) {
-                        Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
-                        navController.popBackStack()
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = "splash",
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable("splash") {
+                SplashScreen(onTimeout = {
+                    if (preferenceManager.isRemembered()) {
+                        navController.navigate("home") {
+                            popUpTo("splash") { inclusive = true }
+                        }
                     } else {
-                        Toast.makeText(context, "Vui lòng điền đầy đủ các trường", Toast.LENGTH_SHORT).show()
+                        navController.navigate("login") {
+                            popUpTo("splash") { inclusive = true }
+                        }
                     }
-                },
-                onBackToLoginClick = { navController.popBackStack() }
-            )
-        }
-        composable("home") {
-            HomeScreen()
+                })
+            }
+            composable("login") {
+                LoginScreen(
+                    onLoginClick = { email, password, rememberMe ->
+                        if (email.isNotEmpty() && password.isNotEmpty()) {
+                            preferenceManager.saveLoginState(rememberMe, email)
+                            Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+                            navController.navigate("home") {
+                                popUpTo("login") { inclusive = true }
+                            }
+                        } else {
+                            Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onRegisterClick = { navController.navigate("register") },
+                    onForgotPasswordClick = {
+                        Toast.makeText(context, "Tính năng đang phát triển", Toast.LENGTH_SHORT).show()
+                    },
+                    onGoogleSignInClick = {
+                        launcher.launch(googleAuthUiClient.getSignInIntent())
+                    },
+                    onFacebookSignInClick = {
+                        LoginManager.getInstance().logInWithReadPermissions(
+                            context as androidx.activity.result.ActivityResultRegistryOwner,
+                            callbackManager,
+                            listOf("email", "public_profile")
+                        )
+                    }
+                )
+            }
+            composable("register") {
+                RegisterScreen(
+                    onRegisterClick = { name, email, phone, password ->
+                        if (name.isNotEmpty() && email.isNotEmpty() && phone.isNotEmpty() && password.isNotEmpty()) {
+                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
+                        } else {
+                            Toast.makeText(context, "Vui lòng điền đầy đủ các trường", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onBackToLoginClick = { navController.popBackStack() }
+                )
+            }
+            composable("home") {
+                HomeScreen(
+                    onProductClick = { productId ->
+                        Toast.makeText(context, "Bấm vào sản phẩm: $productId", Toast.LENGTH_SHORT).show()
+                    },
+                    onCategoryClick = { categoryName ->
+                        Toast.makeText(context, "Bấm vào danh mục: $categoryName", Toast.LENGTH_SHORT).show()
+                    },
+                    onNotificationClick = {
+                        Toast.makeText(context, "Mở thông báo", Toast.LENGTH_SHORT).show()
+                    },
+                    onCartClick = {
+                        Toast.makeText(context, "Mở giỏ hàng", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+            composable("profile") {
+                ProfileScreen(
+                    onLogoutClick = {
+                        Firebase.auth.signOut()
+                        LoginManager.getInstance().logOut()
+                        preferenceManager.clearLoginState()
+                        Toast.makeText(context, "Đã đăng xuất", Toast.LENGTH_SHORT).show()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
     }
 }
