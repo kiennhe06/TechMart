@@ -15,8 +15,15 @@ class HomeViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
+    private val _selectedCategoryId = MutableStateFlow<Int?>(null)
+    val selectedCategoryId: StateFlow<Int?> = _selectedCategoryId
+
     init {
         fetchHomeData()
+    }
+
+    fun selectCategory(categoryId: Int?) {
+        _selectedCategoryId.value = if (_selectedCategoryId.value == categoryId) null else categoryId
     }
 
     fun fetchHomeData() {

@@ -34,9 +34,11 @@ import fpl.ph60001.techmart.home.viewmodel.HomeViewModel
 import fpl.ph60001.techmart.network.BannerDto
 import fpl.ph60001.techmart.network.CategoryDto
 import fpl.ph60001.techmart.network.ProductDto
+import fpl.ph60001.techmart.network.SimpleProductDto
 import fpl.ph60001.techmart.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import coil.compose.AsyncImage
 
 @Composable
 fun HomeScreen(
@@ -48,6 +50,7 @@ fun HomeScreen(
 ) {
     val homeData by homeViewModel.homeData.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()
+    val selectedCategoryId by homeViewModel.selectedCategoryId.collectAsState()
 
     Scaffold(
         topBar = { 
@@ -76,7 +79,16 @@ fun HomeScreen(
 
                 // 2. Category Section
                 homeData?.categories?.let { categories ->
-                    item { CategorySection(categories, onCategoryClick) }
+                    item { 
+                        CategorySection(
+                            categories = categories, 
+                            selectedCategoryId = selectedCategoryId,
+                            onCategoryClick = { category ->
+                                homeViewModel.selectCategory(category.id)
+                                onCategoryClick(category.name)
+                            }
+                        ) 
+                    }
                 }
 
                 // 3. Flash Sale Section
@@ -89,9 +101,31 @@ fun HomeScreen(
                     SectionHeader(title = "Sản phẩm mới nhất", onSeeAllClick = { /* Điều hướng tới DS sản phẩm */ })
                 }
 
-                // Mock Product Grid Placeholder
-                item {
-                    Spacer(modifier = Modifier.height(200.dp))
+                // 5. Product Grid
+                homeData?.allProducts?.let { products ->
+                    item {
+                        val filteredProducts = if (selectedCategoryId != null) {
+                            products.filter { it.categoryId == selectedCategoryId }
+                        } else {
+                            products
+                        }
+                        
+                        if (filteredProducts.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Không có sản phẩm nào trong danh mục này",
+                                    style = MaterialTheme.typography.bodyMedium.copy(color = TechGray)
+                                )
+                            }
+                        } else {
+                            ProductGrid(filteredProducts, onProductClick)
+                        }
+                    }
                 }
             }
         }
@@ -140,13 +174,6 @@ fun HomeTopBar(
 fun AutoSlidingBanner(banners: List<BannerDto>) {
     val pagerState = rememberPagerState(pageCount = { banners.size })
 
-    // Map string image names to drawable resources for mock demo
-    val bannerResources = mapOf(
-        "banner_laptop" to R.drawable.banner_laptop,
-        "banner_iphone" to R.drawable.banner_iphone,
-        "banner_gaming" to R.drawable.banner_gaming
-    )
-
     LaunchedEffect(key1 = pagerState.currentPage) {
         launch {
             delay(4000)
@@ -168,9 +195,8 @@ fun AutoSlidingBanner(banners: List<BannerDto>) {
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            val resId = bannerResources[banners[page].imageUrl] ?: R.drawable.banner_laptop
-            Image(
-                painter = painterResource(id = resId),
+            AsyncImage(
+                model = banners[page].imageUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
@@ -200,7 +226,11 @@ fun AutoSlidingBanner(banners: List<BannerDto>) {
 }
 
 @Composable
-fun CategorySection(categories: List<CategoryDto>, onCategoryClick: (String) -> Unit) {
+fun CategorySection(
+    categories: List<CategoryDto>, 
+    selectedCategoryId: Int?,
+    onCategoryClick: (CategoryDto) -> Unit
+) {
     val iconMap = mapOf(
         "Smartphone" to Icons.Default.Smartphone,
         "Laptop" to Icons.Default.Laptop,
@@ -216,27 +246,35 @@ fun CategorySection(categories: List<CategoryDto>, onCategoryClick: (String) -> 
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(categories) { category ->
+                val isSelected = selectedCategoryId == category.id
+                val bgColor = if (isSelected) BluePrimary else TechSlate
+                val iconColor = if (isSelected) WhitePure else BluePrimary
+                val textColor = if (isSelected) BluePrimary else WhitePure
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { onCategoryClick(category.name) }
+                    modifier = Modifier.clickable { onCategoryClick(category) }
                 ) {
                     Box(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(TechSlate),
+                            .background(bgColor),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = iconMap[category.icon] ?: Icons.Default.Devices,
                             contentDescription = null,
-                            tint = BluePrimary,
+                            tint = iconColor,
                             modifier = Modifier.size(32.dp)
                         )
                     }
                     Text(
                         text = category.name,
-                        style = MaterialTheme.typography.bodySmall.copy(color = WhitePure),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = textColor,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        ),
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -338,16 +376,16 @@ fun FlashSaleItem(product: ProductDto, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(8.dp)
     ) {
-        Box(
+        AsyncImage(
+            model = product.image,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(100.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(TechSlate),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Devices, contentDescription = null, tint = TechGray, modifier = Modifier.size(48.dp))
-        }
+                .background(TechSlate)
+        )
         Text(
             text = product.name,
             style = MaterialTheme.typography.bodyMedium.copy(color = WhitePure),
@@ -401,5 +439,70 @@ fun SectionHeader(title: String, onSeeAllClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall.copy(color = BluePrimary)
             )
         }
+    }
+}
+
+@Composable
+fun ProductGrid(products: List<SimpleProductDto>, onProductClick: (String) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val chunkedProducts = products.chunked(2)
+        for (row in chunkedProducts) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                for (product in row) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SimpleProductItem(product = product, onClick = { onProductClick(product.id) })
+                    }
+                }
+                // Handle odd number of items
+                if (row.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SimpleProductItem(product: SimpleProductDto, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(TechDark)
+            .clickable(onClick = onClick)
+            .padding(8.dp)
+    ) {
+        AsyncImage(
+            model = product.image,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(TechSlate)
+        )
+        Text(
+            text = product.name,
+            style = MaterialTheme.typography.bodyMedium.copy(color = WhitePure),
+            modifier = Modifier.padding(top = 8.dp),
+            maxLines = 2
+        )
+        Text(
+            text = product.price,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = BluePrimary,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }

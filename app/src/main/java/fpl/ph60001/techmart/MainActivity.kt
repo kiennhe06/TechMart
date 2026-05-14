@@ -40,6 +40,7 @@ import fpl.ph60001.techmart.auth.ui.RegisterScreen
 import fpl.ph60001.techmart.auth.ui.SplashScreen
 import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.profile.ui.ProfileScreen
+import fpl.ph60001.techmart.product.ui.ProductDetailScreen
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
 import kotlinx.coroutines.launch
@@ -238,7 +239,7 @@ fun TechMartApp(callbackManager: CallbackManager) {
             composable("home") {
                 HomeScreen(
                     onProductClick = { productId ->
-                        Toast.makeText(context, "Bấm vào sản phẩm: $productId", Toast.LENGTH_SHORT).show()
+                        navController.navigate("product_detail/$productId")
                     },
                     onCategoryClick = { categoryName ->
                         Toast.makeText(context, "Bấm vào danh mục: $categoryName", Toast.LENGTH_SHORT).show()
@@ -262,6 +263,13 @@ fun TechMartApp(callbackManager: CallbackManager) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
+                )
+            }
+            composable("product_detail/{productId}") { backStackEntry ->
+                val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                ProductDetailScreen(
+                    productId = productId,
+                    onBackClick = { navController.popBackStack() }
                 )
             }
         }
