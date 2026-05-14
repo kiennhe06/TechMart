@@ -39,6 +39,7 @@ import fpl.ph60001.techmart.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
+import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 
 @Composable
 fun HomeScreen(
@@ -46,7 +47,8 @@ fun HomeScreen(
     onCategoryClick: (String) -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onCartClick: () -> Unit = {},
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel(),
+    cartViewModel: CartViewModel = viewModel()
 ) {
     val homeData by homeViewModel.homeData.collectAsState()
     val isLoading by homeViewModel.isLoading.collectAsState()

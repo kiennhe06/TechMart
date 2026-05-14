@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +42,9 @@ import fpl.ph60001.techmart.auth.ui.SplashScreen
 import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.profile.ui.ProfileScreen
 import fpl.ph60001.techmart.product.ui.ProductDetailScreen
+import fpl.ph60001.techmart.product.ui.FavoriteScreen
+import fpl.ph60001.techmart.cart.ui.CartScreen
+import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
 import kotlinx.coroutines.launch
@@ -77,6 +81,11 @@ fun TechMartApp(callbackManager: CallbackManager) {
     val scope = rememberCoroutineScope()
     val preferenceManager = remember { PreferenceManager(context) }
     val googleAuthUiClient = remember { GoogleAuthUiClient(context) }
+    val cartViewModel: CartViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            return CartViewModel(preferenceManager) as T
+        }
+    })
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -248,8 +257,18 @@ fun TechMartApp(callbackManager: CallbackManager) {
                         Toast.makeText(context, "Mở thông báo", Toast.LENGTH_SHORT).show()
                     },
                     onCartClick = {
-                        Toast.makeText(context, "Mở giỏ hàng", Toast.LENGTH_SHORT).show()
-                    }
+                        navController.navigate("cart")
+                    },
+                    cartViewModel = cartViewModel
+                )
+            }
+            composable("cart") {
+                CartScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onCheckoutClick = {
+                        Toast.makeText(context, "Tính năng thanh toán đang phát triển", Toast.LENGTH_SHORT).show()
+                    },
+                    viewModel = cartViewModel
                 )
             }
             composable("profile") {
@@ -262,14 +281,27 @@ fun TechMartApp(callbackManager: CallbackManager) {
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
+                    },
+                    onFavoriteClick = {
+                        navController.navigate("favorites")
                     }
+                )
+            }
+            composable("favorites") {
+                FavoriteScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onProductClick = { productId ->
+                        navController.navigate("product_detail/$productId")
+                    },
+                    cartViewModel = cartViewModel
                 )
             }
             composable("product_detail/{productId}") { backStackEntry ->
                 val productId = backStackEntry.arguments?.getString("productId") ?: ""
                 ProductDetailScreen(
                     productId = productId,
-                    onBackClick = { navController.popBackStack() }
+                    onBackClick = { navController.popBackStack() },
+                    cartViewModel = cartViewModel
                 )
             }
         }

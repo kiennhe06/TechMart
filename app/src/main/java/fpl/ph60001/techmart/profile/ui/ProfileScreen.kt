@@ -26,7 +26,8 @@ import fpl.ph60001.techmart.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onFavoriteClick: () -> Unit = {}
 ) {
     val user = Firebase.auth.currentUser
 
@@ -89,7 +90,7 @@ fun ProfileScreen(
             // Profile Options
             ProfileOptionItem(icon = Icons.Default.Person, title = "Thông tin cá nhân")
             ProfileOptionItem(icon = Icons.Default.History, title = "Lịch sử mua hàng")
-            ProfileOptionItem(icon = Icons.Default.Favorite, title = "Sản phẩm yêu thích")
+            ProfileOptionItem(icon = Icons.Default.Favorite, title = "Sản phẩm yêu thích", onClick = onFavoriteClick)
             ProfileOptionItem(icon = Icons.Default.Settings, title = "Cài đặt")
 
             Spacer(modifier = Modifier.weight(1f))
@@ -122,14 +123,14 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileOptionItem(icon: ImageVector, title: String) {
+fun ProfileOptionItem(icon: ImageVector, title: String, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(TechSlate.copy(alpha = 0.3f))
-            .clickable { }
+            .clickable { onClick() }
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

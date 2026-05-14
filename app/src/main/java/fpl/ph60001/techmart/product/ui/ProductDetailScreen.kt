@@ -23,9 +23,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import fpl.ph60001.techmart.network.ProductDetailDto
 import fpl.ph60001.techmart.network.RetrofitClient
+import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 import fpl.ph60001.techmart.ui.theme.*
+import fpl.ph60001.techmart.network.ProductDetailDto
+import androidx.compose.material.icons.filled.Favorite
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -57,16 +59,23 @@ class ProductDetailViewModel : ViewModel() {
 fun ProductDetailScreen(
     productId: String,
     onBackClick: () -> Unit,
-    viewModel: ProductDetailViewModel = viewModel()
+    viewModel: ProductDetailViewModel = viewModel(),
+    cartViewModel: CartViewModel = viewModel()
 ) {
     val product by viewModel.product.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val favoriteIds by cartViewModel.favoriteIds.collectAsState()
+    val isFavorite = favoriteIds.contains(productId)
+    
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(productId) {
         viewModel.loadProduct(productId)
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Chi tiết sản phẩm", color = WhitePure) },
@@ -76,16 +85,28 @@ fun ProductDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.FavoriteBorder, contentDescription = null, tint = WhitePure)
+                    IconButton(onClick = { cartViewModel.toggleFavorite(productId) }) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isFavorite) Color.Red else WhitePure
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = TechDark)
             )
         },
         bottomBar = {
-            product?.let {
-                BottomPurchaseBar(price = it.price)
+            product?.let { item ->
+                BottomPurchaseBar(
+                    price = item.price,
+                    onAddToCart = {
+                        cartViewModel.addToCart(item)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Đã thêm vào giỏ hàng!")
+                        }
+                    }
+                )
             }
         },
         containerColor = TechDark
@@ -185,7 +206,7 @@ fun SpecificationRow(key: String, value: String) {
 }
 
 @Composable
-fun BottomPurchaseBar(price: String) {
+fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = TechDark,
@@ -200,7 +221,7 @@ fun BottomPurchaseBar(price: String) {
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OutlinedButton(
-                onClick = {},
+                onClick = onAddToCart,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = BluePrimary)
