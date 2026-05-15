@@ -6,9 +6,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    // 10.0.2.2 là địa chỉ IP đặc biệt của máy ảo Android để truy cập localhost của máy tính
     private const val BASE_URL = "http://10.0.2.2:3000/"
-    // API lấy dữ liệu tỉnh/quận/phường Việt Nam
     private const val LOCATION_BASE_URL = "https://provinces.open-api.vn/"
 
     private val logging = HttpLoggingInterceptor().apply {

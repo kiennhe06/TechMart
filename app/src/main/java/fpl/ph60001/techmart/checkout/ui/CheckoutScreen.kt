@@ -34,6 +34,9 @@ import fpl.ph60001.techmart.network.RetrofitClient
 import fpl.ph60001.techmart.network.WardDto
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
+import fpl.ph60001.techmart.order.Order
+import fpl.ph60001.techmart.order.OrderItem
+import fpl.ph60001.techmart.order.OrderRepository
 import kotlinx.coroutines.launch
 
 // Kiểm tra số điện thoại Việt Nam hợp lệ
@@ -45,16 +48,17 @@ private fun isValidPhone(phone: String): Boolean {
 @Composable
 fun CheckoutScreen(
     onBackClick: () -> Unit,
-    onOrderSuccess: () -> Unit,
+    onNavigateToConfirmation: (total: String, address: String, payment: String, itemCount: Int) -> Unit,
     cartViewModel: CartViewModel
 ) {
     val context = LocalContext.current
     val prefManager = remember { PreferenceManager(context) }
+    val orderRepo = remember { OrderRepository(context) }
     val scope = rememberCoroutineScope()
     val cartItems by cartViewModel.checkoutItems.collectAsState()
 
     var selectedPayment by remember { mutableIntStateOf(0) }
-    var showSuccessDialog by remember { mutableStateOf(false) }
+    var isShippingCollapsed by remember { mutableStateOf(prefManager.getShippingName().isNotBlank() && prefManager.getShippingPhone().isNotBlank()) }
 
     // Thông tin giao hàng - auto-fill từ lần trước
     var fullName by remember { mutableStateOf(prefManager.getShippingName()) }
@@ -144,14 +148,48 @@ fun CheckoutScreen(
             )
         },
         bottomBar = {
+            val paymentLabels = listOf("Thanh toán khi nhận hàng (COD)", "Chuyển khoản ngân hàng", "Ví điện tử")
             CheckoutBottomBar(total = fmtTotal, enabled = isFormValid, onPlaceOrder = {
-                // Lưu thông tin giao hàng cho lần mua sau
-                prefManager.saveShippingInfo(
-                    fullName, phone,
-                    selectedProvince?.name ?: "",
-                    selectedWard?.name ?: "", addressDetail
-                )
-                showSuccessDialog = true
+                scope.launch {
+                    try {
+                        val address = "$addressDetail, ${selectedWard?.name ?: ""}, ${selectedProvince?.name ?: ""}"
+                        val payment = paymentLabels.getOrElse(selectedPayment) { paymentLabels[0] }
+                        val orderItems = cartItems.map { OrderItem(it.name, it.price, it.image, it.quantity) }
+                        
+                        val order = Order(
+                            id = "TM" + System.currentTimeMillis(),
+                            items = orderItems,
+                            total = fmtTotal,
+                            address = address,
+                            paymentMethod = payment,
+                            customerName = fullName,
+                            customerPhone = phone
+                        )
+
+                        // 1. Gửi lên Server
+                        val response = RetrofitClient.apiService.createOrder(order)
+                        if (response.isSuccessful) {
+                            // 2. Lưu cục bộ để xem offline
+                            orderRepo.saveOrder(order)
+                            
+                            // 3. Lưu thông tin giao hàng cho lần sau
+                            prefManager.saveShippingInfo(
+                                fullName, phone,
+                                selectedProvince?.name ?: "",
+                                selectedWard?.name ?: "", addressDetail
+                            )
+                            
+                            val itemCount = cartItems.sumOf { it.quantity }
+                            cartViewModel.clearCart()
+                            onNavigateToConfirmation(fmtTotal, address, payment, itemCount)
+                        } else {
+                            // Xử lý lỗi server (ví dụ hết hàng)
+                            android.widget.Toast.makeText(context, "Lỗi đặt hàng: ${response.message()}", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Lỗi kết nối server: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
             })
         },
         containerColor = TechDark
@@ -163,7 +201,25 @@ fun CheckoutScreen(
         ) {
             // === 1. THÔNG TIN NHẬN HÀNG ===
             SectionCard(Icons.Default.LocationOn, "Thông tin nhận hàng") {
-                // Họ và tên
+                if (isShippingCollapsed) {
+                    // Hiển thị tóm tắt khi thu gọn
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable { isShippingCollapsed = false }.padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "$fullName | $phone", color = WhitePure, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(
+                                text = "$addressDetail, $wardQuery, $provinceQuery",
+                                color = TechGray, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        TextButton(onClick = { isShippingCollapsed = false }) {
+                            Text("Thay đổi", color = BluePrimary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    // Họ và tên
                 OutlinedTextField(
                     value = fullName, onValueChange = { fullName = it },
                     label = { Text("Họ và tên *") }, singleLine = true,
@@ -318,7 +374,21 @@ fun CheckoutScreen(
                     leadingIcon = { Icon(Icons.Default.Edit, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
                     modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                 )
+
+                if (!isShippingCollapsed && fullName.isNotBlank() && phone.isNotBlank() && selectedWard != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { isShippingCollapsed = true },
+                        modifier = Modifier.align(Alignment.End),
+                        colors = ButtonDefaults.buttonColors(containerColor = TechDark),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                    ) {
+                        Text("Lưu & Thu gọn", color = BluePrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
+        }
 
             // === 2. SẢN PHẨM ĐẶT MUA ===
             SectionCard(Icons.Default.ShoppingBag, "Sản phẩm đặt mua (${cartItems.size})") {
@@ -356,30 +426,6 @@ fun CheckoutScreen(
         }
     }
 
-    // Dialog đặt hàng thành công
-    if (showSuccessDialog) {
-        AlertDialog(
-            onDismissRequest = {}, containerColor = TechSlate,
-            icon = {
-                Box(Modifier.size(64.dp).clip(CircleShape).background(Brush.linearGradient(listOf(BluePrimary, CyberCyan))), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.CheckCircle, null, tint = WhitePure, modifier = Modifier.size(40.dp))
-                }
-            },
-            title = { Text("Đặt hàng thành công!", color = WhitePure, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Cảm ơn bạn đã mua hàng tại TechMart", color = TechGray, fontSize = 14.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text("Đơn hàng của bạn sẽ được xử lý trong thời gian sớm nhất.", color = TechGray, fontSize = 14.sp)
-                }
-            },
-            confirmButton = {
-                Button(onClick = { cartViewModel.clearCart(); onOrderSuccess() },
-                    shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = BluePrimary), modifier = Modifier.fillMaxWidth()
-                ) { Text("Về trang chủ", fontWeight = FontWeight.Bold) }
-            }
-        )
-    }
 }
 
 // --- CÁC COMPOSABLE PHỤ TRỢ ---

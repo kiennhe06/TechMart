@@ -102,6 +102,7 @@ fun ProductDetailScreen(
             product?.let { item ->
                 BottomPurchaseBar(
                     price = item.price,
+                    stock = item.stock,
                     onAddToCart = {
                         cartViewModel.addToCart(item)
                         scope.launch {
@@ -149,14 +150,31 @@ fun ProductDetailScreen(
                             )
                         )
                         
-                        Text(
-                            text = item.price,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                color = BluePrimary,
-                                fontWeight = FontWeight.Black
-                            ),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = item.price,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    color = BluePrimary,
+                                    fontWeight = FontWeight.Black
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                            
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (item.stock > 0) BluePrimary.copy(0.1f) else Color.Red.copy(0.1f)
+                            ) {
+                                Text(
+                                    text = if (item.stock > 0) "Sẵn có: ${item.stock}" else "Hết hàng",
+                                    color = if (item.stock > 0) BluePrimary else Color.Red,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                        }
 
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 16.dp),
@@ -212,7 +230,8 @@ fun SpecificationRow(key: String, value: String) {
 }
 
 @Composable
-fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit, onBuyNow: () -> Unit = {}) {
+fun BottomPurchaseBar(price: String, stock: Int = 1, onAddToCart: () -> Unit, onBuyNow: () -> Unit = {}) {
+    val isOutOfStock = stock <= 0
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = TechDark,
@@ -230,6 +249,7 @@ fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit, onBuyNow: () -> Un
                 onClick = onAddToCart,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
+                enabled = !isOutOfStock,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = BluePrimary)
             ) {
                 Icon(Icons.Default.ShoppingCart, contentDescription = null)
@@ -241,9 +261,13 @@ fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit, onBuyNow: () -> Un
                 onClick = onBuyNow,
                 modifier = Modifier.weight(1.5f),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary)
+                enabled = !isOutOfStock,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isOutOfStock) TechGray else BluePrimary,
+                    contentColor = if (isOutOfStock) WhitePure.copy(0.5f) else WhitePure
+                )
             ) {
-                Text("Mua ngay", fontWeight = FontWeight.Bold)
+                Text(if (isOutOfStock) "Hết hàng" else "Mua ngay", fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -429,11 +429,23 @@ fun FlashSaleItem(product: ProductDto, onClick: () -> Unit) {
             color = Color(0xFFFF4D4D),
             trackColor = TechSlate
         )
-        Text(
-            text = "Đã bán ${(product.soldProgress * 100).toInt()}%",
-            style = MaterialTheme.typography.labelSmall.copy(color = TechGray, fontSize = 10.sp),
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Đã bán ${(product.soldProgress * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall.copy(color = TechGray, fontSize = 10.sp)
+            )
+            Text(
+                text = "Kho: ${product.stock}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = if (product.stock < 5) Color(0xFFFF4D4D) else BluePrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
     }
 }
 
@@ -523,6 +535,14 @@ fun SimpleProductItem(product: SimpleProductDto, onClick: () -> Unit) {
                 fontWeight = FontWeight.Bold
             ),
             modifier = Modifier.padding(top = 4.dp)
+        )
+        Text(
+            text = "Còn lại: ${product.stock}",
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = if (product.stock < 5) Color(0xFFFF4D4D) else TechGray,
+                fontWeight = if (product.stock < 5) FontWeight.Bold else FontWeight.Normal
+            ),
+            modifier = Modifier.padding(top = 2.dp)
         )
     }
 }

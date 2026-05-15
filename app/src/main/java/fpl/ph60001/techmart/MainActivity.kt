@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -48,6 +49,9 @@ import fpl.ph60001.techmart.product.ui.FlashSaleListScreen
 import fpl.ph60001.techmart.cart.ui.CartScreen
 import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 import fpl.ph60001.techmart.checkout.ui.CheckoutScreen
+import fpl.ph60001.techmart.checkout.ui.OrderConfirmationScreen
+import fpl.ph60001.techmart.order.ui.OrderHistoryScreen
+import fpl.ph60001.techmart.order.ui.OrderDetailScreen
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
 import kotlinx.coroutines.launch
@@ -137,7 +141,7 @@ fun TechMartApp(callbackManager: CallbackManager) {
         }
     )
 
-    val showBottomBar = currentDestination?.route in listOf("home", "profile")
+    val showBottomBar = currentDestination?.route in listOf("home", "orders", "profile")
 
     Scaffold(
         bottomBar = {
@@ -152,6 +156,25 @@ fun TechMartApp(callbackManager: CallbackManager) {
                         selected = currentDestination?.hierarchy?.any { it.route == "home" } == true,
                         onClick = {
                             navController.navigate("home") {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = BluePrimary,
+                            selectedTextColor = BluePrimary,
+                            unselectedIconColor = TechGray,
+                            unselectedTextColor = TechGray,
+                            indicatorColor = TechDark
+                        )
+                    )
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Filled.Receipt, contentDescription = null) },
+                        label = { Text("Đơn hàng") },
+                        selected = currentDestination?.hierarchy?.any { it.route == "orders" } == true,
+                        onClick = {
+                            navController.navigate("orders") {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -300,13 +323,43 @@ fun TechMartApp(callbackManager: CallbackManager) {
             composable("checkout") {
                 CheckoutScreen(
                     onBackClick = { navController.popBackStack() },
-                    onOrderSuccess = {
-                        navController.navigate("home") {
-                            popUpTo("home") { inclusive = true }
+                    onNavigateToConfirmation = { total, address, payment, itemCount ->
+                        val encodedTotal = java.net.URLEncoder.encode(total, "UTF-8")
+                        val encodedAddress = java.net.URLEncoder.encode(address, "UTF-8")
+                        val encodedPayment = java.net.URLEncoder.encode(payment, "UTF-8")
+                        navController.navigate("order_confirmation/$encodedTotal/$encodedAddress/$encodedPayment/$itemCount") {
+                            popUpTo("home")
                         }
                     },
                     cartViewModel = cartViewModel
                 )
+            }
+            composable("order_confirmation/{total}/{address}/{payment}/{itemCount}") { backStackEntry ->
+                val total = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("total") ?: "", "UTF-8")
+                val address = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("address") ?: "", "UTF-8")
+                val payment = java.net.URLDecoder.decode(backStackEntry.arguments?.getString("payment") ?: "", "UTF-8")
+                val itemCount = backStackEntry.arguments?.getString("itemCount")?.toIntOrNull() ?: 0
+                OrderConfirmationScreen(
+                    orderTotal = total,
+                    shippingAddress = address,
+                    paymentMethod = payment,
+                    itemCount = itemCount,
+                    onBackToHome = {
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable("orders") {
+                OrderHistoryScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onOrderClick = { orderId -> navController.navigate("order_detail/$orderId") }
+                )
+            }
+            composable("order_detail/{orderId}") { backStackEntry ->
+                val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
+                OrderDetailScreen(orderId = orderId, onBackClick = { navController.popBackStack() })
             }
             composable("profile") {
                 ProfileScreen(

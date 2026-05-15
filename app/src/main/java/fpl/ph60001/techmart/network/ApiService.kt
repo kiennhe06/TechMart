@@ -1,7 +1,12 @@
 package fpl.ph60001.techmart.network
 
+import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PATCH
 import retrofit2.http.Path
+import fpl.ph60001.techmart.order.Order
 
 // Data Models
 data class HomeDataResponse(
@@ -28,7 +33,8 @@ data class ProductDto(
     val price: String,
     val discount: Int,
     val soldProgress: Float,
-    val image: String
+    val image: String,
+    val stock: Int = 0
 )
 
 data class SimpleProductDto(
@@ -36,7 +42,8 @@ data class SimpleProductDto(
     val name: String,
     val price: String,
     val image: String,
-    val categoryId: Int
+    val categoryId: Int,
+    val stock: Int = 0
 )
 
 data class ProductDetailDto(
@@ -44,6 +51,7 @@ data class ProductDetailDto(
     val name: String,
     val price: String,
     val image: String,
+    val stock: Int = 0,
     val description: String,
     val specifications: List<SpecificationDto>
 )
@@ -59,4 +67,16 @@ interface ApiService {
 
     @GET("api/products/{id}")
     suspend fun getProductDetail(@Path("id") id: String): ProductDetailDto
+
+    @POST("api/orders/create")
+    suspend fun createOrder(@Body order: Order): Response<Unit>
+
+    @GET("api/orders")
+    suspend fun getOrders(): List<Order>
+
+    @PATCH("api/orders/{id}/cancel")
+    suspend fun cancelOrder(@Path("id") id: String): Response<Unit>
+
+    @POST("api/orders/{id}/review")
+    suspend fun submitReview(@Path("id") id: String, @Body review: fpl.ph60001.techmart.order.OrderReview): Response<Unit>
 }
