@@ -1,14 +1,18 @@
 package fpl.ph60001.techmart.cart.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +36,18 @@ fun CartScreen(
 ) {
     val cartItems by viewModel.cartItems.collectAsState()
 
+    // State quản lý việc hiển thị Dialog xóa
+    var itemToDelete by remember { mutableStateOf<CartItem?>(null) }
+    // State quản lý các item được chọn (ID)
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
+
+    // Tự động chọn tất cả khi mới vào hoặc cập nhật logic chọn
+    LaunchedEffect(cartItems) {
+        if (selectedIds.isEmpty() && cartItems.isNotEmpty()) {
+            selectedIds = cartItems.map { it.id }.toSet()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -46,7 +62,9 @@ fun CartScreen(
         },
         bottomBar = {
             if (cartItems.isNotEmpty()) {
-                CartBottomBar(cartItems, onCheckoutClick)
+                // Chỉ truyền những item được chọn xuống BottomBar để tính tiền
+                val selectedItems = cartItems.filter { selectedIds.contains(it.id) }
+                CartBottomBar(selectedItems, onCheckoutClick)
             }
         },
         containerColor = TechDark
@@ -64,12 +82,43 @@ fun CartScreen(
                 items(cartItems) { item ->
                     CartItemRow(
                         item = item,
+                        isSelected = selectedIds.contains(item.id),
+                        onToggleSelect = {
+                            selectedIds = if (selectedIds.contains(item.id)) {
+                                selectedIds - item.id
+                            } else {
+                                selectedIds + item.id
+                            }
+                        },
                         onIncrease = { viewModel.updateQuantity(item.id, 1) },
                         onDecrease = { viewModel.updateQuantity(item.id, -1) },
-                        onRemove = { viewModel.removeFromCart(item.id) }
+                        onRemove = { itemToDelete = item } // Mở dialog
                     )
                 }
             }
+        }
+
+        // Dialog xác nhận xóa
+        itemToDelete?.let { item ->
+            AlertDialog(
+                onDismissRequest = { itemToDelete = null },
+                containerColor = TechSlate,
+                title = { Text("Xác nhận xóa", color = WhitePure) },
+                text = { Text("Bạn có chắc chắn muốn xóa sản phẩm ${item.name} khỏi giỏ hàng?", color = TechGray) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.removeFromCart(item.id)
+                        itemToDelete = null
+                    }) {
+                        Text("Xóa", color = Color.Red)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { itemToDelete = null }) {
+                        Text("Hủy", color = WhitePure)
+                    }
+                }
+            )
         }
     }
 }
@@ -77,6 +126,8 @@ fun CartScreen(
 @Composable
 fun CartItemRow(
     item: CartItem,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
     onRemove: () -> Unit
@@ -90,6 +141,17 @@ fun CartItemRow(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 1. Checkbox chọn sản phẩm
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = { onToggleSelect() },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = BluePrimary,
+                    uncheckedColor = TechGray
+                )
+            )
+
+            // 2. Hình ảnh sản phẩm
             AsyncImage(
                 model = item.image,
                 contentDescription = null,
@@ -99,7 +161,7 @@ fun CartItemRow(
                     .clip(RoundedCornerShape(12.dp))
                     .background(TechDark)
             )
-            
+
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -108,8 +170,7 @@ fun CartItemRow(
                 Text(
                     text = item.name,
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = WhitePure
+                        fontWeight = FontWeight.Bold, color = WhitePure
                     ),
                     maxLines = 1
                 )
@@ -117,36 +178,63 @@ fun CartItemRow(
                     text = item.price,
                     style = MaterialTheme.typography.bodyMedium.copy(color = BluePrimary)
                 )
-                
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // --- PHẦN CHỈNH SỬA: BỘ TĂNG GIẢM SỐ LƯỢNG MỚI ---
                 Row(
-                    modifier = Modifier.padding(top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .clip(CircleShape) // Tạo hình viên thuốc
+                        .background(TechDark) // Nền tối chìm xuống
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     IconButton(
                         onClick = onDecrease,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .background(TechDark, RoundedCornerShape(4.dp))
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Remove, contentDescription = null, tint = WhitePure, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = null,
+                            tint = if (item.quantity > 1) WhitePure else TechGray,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    
-                    Text(text = item.quantity.toString(), color = WhitePure, fontWeight = FontWeight.Bold)
-                    
+
+                    Text(
+                        text = item.quantity.toString(),
+                        color = WhitePure,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
                     IconButton(
                         onClick = onIncrease,
                         modifier = Modifier
                             .size(28.dp)
-                            .background(BluePrimary, RoundedCornerShape(4.dp))
+                            .clip(CircleShape)
+                            .background(BluePrimary) // Nổi bật nút thêm
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = WhitePure, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = WhitePure,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
+                // ------------------------------------------------
             }
-            
+
+            // Nút xóa (Thùng rác)
             IconButton(onClick = onRemove) {
-                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red.copy(alpha = 0.7f))
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = Color.Red.copy(alpha = 0.6f),
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
@@ -172,7 +260,7 @@ fun EmptyCartView(modifier: Modifier = Modifier) {
 
 @Composable
 fun CartBottomBar(items: List<CartItem>, onCheckoutClick: () -> Unit) {
-    val total = items.sumOf { 
+    val total = items.sumOf {
         val priceNum = it.price.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L
         priceNum * it.quantity
     }
@@ -189,7 +277,7 @@ fun CartBottomBar(items: List<CartItem>, onCheckoutClick: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Tổng thanh toán:", color = WhitePure)
+                Text("Tổng thanh toán (${items.size}):", color = WhitePure)
                 Text(
                     text = formattedTotal,
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -201,9 +289,13 @@ fun CartBottomBar(items: List<CartItem>, onCheckoutClick: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onCheckoutClick,
+                enabled = items.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BluePrimary,
+                    disabledContainerColor = TechGray
+                )
             ) {
                 Text("Tiến hành thanh toán", fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp))
             }

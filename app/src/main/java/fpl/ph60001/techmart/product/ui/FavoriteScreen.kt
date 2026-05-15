@@ -18,6 +18,8 @@ import fpl.ph60001.techmart.home.ui.SimpleProductItem
 import fpl.ph60001.techmart.home.viewmodel.HomeViewModel
 import fpl.ph60001.techmart.ui.theme.*
 
+import fpl.ph60001.techmart.network.SimpleProductDto
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoriteScreen(
@@ -28,9 +30,20 @@ fun FavoriteScreen(
 ) {
     val favoriteIds by cartViewModel.favoriteIds.collectAsState()
     val homeData by homeViewModel.homeData.collectAsState()
+    val isLoading by homeViewModel.isLoading.collectAsState()
     
-    // Lọc ra các sản phẩm đã yêu thích từ danh sách sản phẩm ở Home
-    val favoriteProducts = homeData?.allProducts?.filter { it.id in favoriteIds } ?: emptyList()
+    val favoriteProducts = remember(homeData, favoriteIds) {
+        val all = mutableListOf<SimpleProductDto>()
+        homeData?.let { data ->
+            all.addAll(data.allProducts)
+            data.flashSale.forEach { flash ->
+                if (all.none { it.id == flash.id }) {
+                    all.add(SimpleProductDto(flash.id, flash.name, flash.price, flash.image, 0))
+                }
+            }
+        }
+        all.filter { it.id in favoriteIds }
+    }
 
     Scaffold(
         topBar = {
@@ -46,7 +59,11 @@ fun FavoriteScreen(
         },
         containerColor = TechDark
     ) { padding ->
-        if (favoriteProducts.isEmpty()) {
+        if (isLoading && homeData == null) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = BluePrimary)
+            }
+        } else if (favoriteIds.isEmpty() || favoriteProducts.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
