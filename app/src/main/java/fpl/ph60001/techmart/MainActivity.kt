@@ -43,6 +43,8 @@ import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.profile.ui.ProfileScreen
 import fpl.ph60001.techmart.product.ui.ProductDetailScreen
 import fpl.ph60001.techmart.product.ui.FavoriteScreen
+import fpl.ph60001.techmart.product.ui.AllProductsScreen
+import fpl.ph60001.techmart.product.ui.FlashSaleListScreen
 import fpl.ph60001.techmart.cart.ui.CartScreen
 import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 import fpl.ph60001.techmart.ui.theme.*
@@ -259,7 +261,29 @@ fun TechMartApp(callbackManager: CallbackManager) {
                     onCartClick = {
                         navController.navigate("cart")
                     },
+                    onSeeAllProductsClick = {
+                        navController.navigate("all_products")
+                    },
+                    onSeeAllFlashSaleClick = {
+                        navController.navigate("flash_sale_list")
+                    },
                     cartViewModel = cartViewModel
+                )
+            }
+            composable("all_products") {
+                AllProductsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onProductClick = { productId ->
+                        navController.navigate("product_detail/$productId")
+                    }
+                )
+            }
+            composable("flash_sale_list") {
+                FlashSaleListScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onProductClick = { productId ->
+                        navController.navigate("product_detail/$productId")
+                    }
                 )
             }
             composable("cart") {

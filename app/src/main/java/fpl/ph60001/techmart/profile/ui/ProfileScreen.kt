@@ -1,3 +1,4 @@
+
 package fpl.ph60001.techmart.profile.ui
 
 import androidx.compose.foundation.background
@@ -9,7 +10,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import fpl.ph60001.techmart.ui.theme.*
+import kotlin.text.take
+import kotlin.text.uppercase
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +35,9 @@ fun ProfileScreen(
     onFavoriteClick: () -> Unit = {}
 ) {
     val user = Firebase.auth.currentUser
+
+    // Biến trạng thái để kiểm soát việc hiển thị thông báo xác nhận đăng xuất
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -95,9 +103,9 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Logout Button
+            // Nút Đăng xuất
             Button(
-                onClick = onLogoutClick,
+                onClick = { showLogoutDialog = true }, // Khi nhấn thì hiện thông báo
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -116,8 +124,44 @@ fun ProfileScreen(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        // Hộp thoại xác nhận đăng xuất
+        if (showLogoutDialog) {
+            AlertDialog(
+                onDismissRequest = { showLogoutDialog = false },
+                containerColor = TechSlate,
+                title = {
+                    Text(
+                        text = "Xác nhận đăng xuất",
+                        color = WhitePure,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Bạn có chắc chắn muốn đăng xuất khỏi TechMart không?",
+                        color = TechGray
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showLogoutDialog = false
+                            onLogoutClick()
+                        }
+                    ) {
+                        Text("Đăng xuất", color = Color.Red, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutDialog = false }) {
+                        Text("Hủy", color = WhitePure)
+                    }
+                }
+            )
         }
     }
 }

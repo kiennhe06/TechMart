@@ -47,6 +47,9 @@ fun HomeScreen(
     onCategoryClick: (String) -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onCartClick: () -> Unit = {},
+    onSeeAllProductsClick: () -> Unit = {},
+    onSeeAllCategoriesClick: () -> Unit = {},
+    onSeeAllFlashSaleClick: () -> Unit = {},
     homeViewModel: HomeViewModel = viewModel(),
     cartViewModel: CartViewModel = viewModel()
 ) {
@@ -55,11 +58,11 @@ fun HomeScreen(
     val selectedCategoryId by homeViewModel.selectedCategoryId.collectAsState()
 
     Scaffold(
-        topBar = { 
+        topBar = {
             HomeTopBar(
                 onNotificationClick = onNotificationClick,
                 onCartClick = onCartClick
-            ) 
+            )
         },
         containerColor = TechDark
     ) { paddingValues ->
@@ -81,26 +84,36 @@ fun HomeScreen(
 
                 // 2. Category Section
                 homeData?.categories?.let { categories ->
-                    item { 
+                    item {
                         CategorySection(
-                            categories = categories, 
+                            categories = categories,
                             selectedCategoryId = selectedCategoryId,
                             onCategoryClick = { category ->
                                 homeViewModel.selectCategory(category.id)
                                 onCategoryClick(category.name)
-                            }
-                        ) 
+                            },
+                            onSeeAllCategoriesClick = onSeeAllCategoriesClick
+                        )
                     }
                 }
 
                 // 3. Flash Sale Section
                 homeData?.flashSale?.let { products ->
-                    item { FlashSaleSection(products, onProductClick) }
+                    item {
+                        FlashSaleSection(
+                            products = products,
+                            onProductClick = onProductClick,
+                            onSeeAllClick = onSeeAllFlashSaleClick // Đã truyền vào
+                        )
+                    }
                 }
 
                 // 4. Featured Section Header
                 item {
-                    SectionHeader(title = "Sản phẩm mới nhất", onSeeAllClick = { /* Điều hướng tới DS sản phẩm */ })
+                    SectionHeader(
+                        title = "Sản phẩm mới nhất",
+                        onSeeAllClick = onSeeAllProductsClick
+                    )
                 }
 
                 // 5. Product Grid
@@ -111,7 +124,7 @@ fun HomeScreen(
                         } else {
                             products
                         }
-                        
+
                         if (filteredProducts.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -187,15 +200,15 @@ fun AutoSlidingBanner(banners: List<BannerDto>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(180.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(TechSlate),
-        contentAlignment = Alignment.Center
     ) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(20.dp))
+                .background(TechSlate)
         ) { page ->
             AsyncImage(
                 model = banners[page].imageUrl,
@@ -209,7 +222,7 @@ fun AutoSlidingBanner(banners: List<BannerDto>) {
         Row(
             Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
+                .padding(bottom = 16.dp)
                 .background(Color.Black.copy(alpha = 0.3f), CircleShape)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
@@ -229,9 +242,10 @@ fun AutoSlidingBanner(banners: List<BannerDto>) {
 
 @Composable
 fun CategorySection(
-    categories: List<CategoryDto>, 
+    categories: List<CategoryDto>,
     selectedCategoryId: Int?,
-    onCategoryClick: (CategoryDto) -> Unit
+    onCategoryClick: (CategoryDto) -> Unit,
+    onSeeAllCategoriesClick: () -> Unit
 ) {
     val iconMap = mapOf(
         "Smartphone" to Icons.Default.Smartphone,
@@ -242,7 +256,7 @@ fun CategorySection(
     )
 
     Column(modifier = Modifier.padding(vertical = 16.dp)) {
-        SectionHeader(title = "Danh mục", onSeeAllClick = {})
+        SectionHeader(title = "Danh mục", onSeeAllClick = onSeeAllCategoriesClick)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -286,8 +300,12 @@ fun CategorySection(
 }
 
 @Composable
-fun FlashSaleSection(products: List<ProductDto>, onProductClick: (String) -> Unit) {
-    var timeLeft by remember { mutableStateOf(36000) } // 10 hours in seconds
+fun FlashSaleSection(
+    products: List<ProductDto>,
+    onProductClick: (String) -> Unit,
+    onSeeAllClick: () -> Unit
+) {
+    var timeLeft by remember { mutableStateOf(36000) }
 
     LaunchedEffect(key1 = true) {
         while (timeLeft > 0) {
@@ -332,12 +350,12 @@ fun FlashSaleSection(products: List<ProductDto>, onProductClick: (String) -> Uni
             Text(
                 text = "Xem tất cả >",
                 style = MaterialTheme.typography.bodySmall.copy(color = BluePrimary),
-                modifier = Modifier.clickable { }
+                modifier = Modifier.clickable { onSeeAllClick() }
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(products) { product ->
                 FlashSaleItem(
