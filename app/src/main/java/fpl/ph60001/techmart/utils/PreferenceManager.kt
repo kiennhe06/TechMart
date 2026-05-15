@@ -53,4 +53,31 @@ class PreferenceManager(context: Context) {
     fun clearLoginState() {
         sharedPreferences.edit().clear().apply()
     }
+
+    // --- Lưu và đọc thông tin giao hàng để auto-fill ---
+    fun saveShippingInfo(
+        name: String,
+        phone: String,
+        province: String,
+        district: String,
+        ward: String,
+        addressDetail: String
+    ) {
+        sharedPreferences.edit().apply {
+            putString("shipping_name", name)
+            putString("shipping_phone", phone)
+            putString("shipping_province", province)
+            putString("shipping_district", district)
+            putString("shipping_ward", ward)
+            putString("shipping_address_detail", addressDetail)
+            apply()
+        }
+    }
+
+    fun getShippingName(): String = sharedPreferences.getString("shipping_name", "") ?: ""
+    fun getShippingPhone(): String = sharedPreferences.getString("shipping_phone", "") ?: ""
+    fun getShippingProvince(): String = sharedPreferences.getString("shipping_province", "") ?: ""
+    fun getShippingDistrict(): String = sharedPreferences.getString("shipping_district", "") ?: ""
+    fun getShippingWard(): String = sharedPreferences.getString("shipping_ward", "") ?: ""
+    fun getShippingAddressDetail(): String = sharedPreferences.getString("shipping_address_detail", "") ?: ""
 }

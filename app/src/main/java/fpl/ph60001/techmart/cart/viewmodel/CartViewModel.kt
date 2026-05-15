@@ -22,6 +22,9 @@ class CartViewModel(private val preferenceManager: PreferenceManager) : ViewMode
     private val _favoriteIds = MutableStateFlow<Set<String>>(preferenceManager.getFavorites())
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds
 
+    private val _checkoutItems = MutableStateFlow<List<CartItem>>(emptyList())
+    val checkoutItems: StateFlow<List<CartItem>> = _checkoutItems
+
     fun addToCart(product: ProductDetailDto) {
         val currentItems = _cartItems.value.toMutableList()
         val existingItem = currentItems.find { it.id == product.id }
@@ -65,5 +68,19 @@ class CartViewModel(private val preferenceManager: PreferenceManager) : ViewMode
                 removeFromCart(productId)
             }
         }
+    }
+
+    fun setCheckoutItems(items: List<CartItem>) {
+        _checkoutItems.value = items
+    }
+
+    fun clearCart() {
+        // Chỉ xóa những sản phẩm đã thanh toán khỏi giỏ hàng
+        val checkoutIds = _checkoutItems.value.map { it.id }.toSet()
+        val remainingItems = _cartItems.value.filter { !checkoutIds.contains(it.id) }
+        
+        _cartItems.value = remainingItems
+        preferenceManager.saveCart(remainingItems)
+        _checkoutItems.value = emptyList() // Xóa danh sách hàng chờ thanh toán
     }
 }

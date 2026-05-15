@@ -28,6 +28,7 @@ import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.network.ProductDetailDto
 import androidx.compose.material.icons.filled.Favorite
+import fpl.ph60001.techmart.cart.viewmodel.CartItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -59,6 +60,7 @@ class ProductDetailViewModel : ViewModel() {
 fun ProductDetailScreen(
     productId: String,
     onBackClick: () -> Unit,
+    onBuyNowClick: (List<CartItem>) -> Unit = {},
     viewModel: ProductDetailViewModel = viewModel(),
     cartViewModel: CartViewModel = viewModel()
 ) {
@@ -105,6 +107,10 @@ fun ProductDetailScreen(
                         scope.launch {
                             snackbarHostState.showSnackbar("Đã thêm vào giỏ hàng!")
                         }
+                    },
+                    onBuyNow = {
+                        val itemToBuy = CartItem(item.id, item.name, item.price, item.image, 1)
+                        onBuyNowClick(listOf(itemToBuy))
                     }
                 )
             }
@@ -206,7 +212,7 @@ fun SpecificationRow(key: String, value: String) {
 }
 
 @Composable
-fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit) {
+fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit, onBuyNow: () -> Unit = {}) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = TechDark,
@@ -232,7 +238,7 @@ fun BottomPurchaseBar(price: String, onAddToCart: () -> Unit) {
             }
             
             Button(
-                onClick = {},
+                onClick = onBuyNow,
                 modifier = Modifier.weight(1.5f),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = BluePrimary)

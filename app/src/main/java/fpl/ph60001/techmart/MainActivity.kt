@@ -47,6 +47,7 @@ import fpl.ph60001.techmart.product.ui.AllProductsScreen
 import fpl.ph60001.techmart.product.ui.FlashSaleListScreen
 import fpl.ph60001.techmart.cart.ui.CartScreen
 import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
+import fpl.ph60001.techmart.checkout.ui.CheckoutScreen
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
 import kotlinx.coroutines.launch
@@ -289,10 +290,22 @@ fun TechMartApp(callbackManager: CallbackManager) {
             composable("cart") {
                 CartScreen(
                     onBackClick = { navController.popBackStack() },
-                    onCheckoutClick = {
-                        Toast.makeText(context, "Tính năng thanh toán đang phát triển", Toast.LENGTH_SHORT).show()
+                    onCheckoutClick = { selectedItems ->
+                        cartViewModel.setCheckoutItems(selectedItems)
+                        navController.navigate("checkout")
                     },
                     viewModel = cartViewModel
+                )
+            }
+            composable("checkout") {
+                CheckoutScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onOrderSuccess = {
+                        navController.navigate("home") {
+                            popUpTo("home") { inclusive = true }
+                        }
+                    },
+                    cartViewModel = cartViewModel
                 )
             }
             composable("profile") {
@@ -325,6 +338,10 @@ fun TechMartApp(callbackManager: CallbackManager) {
                 ProductDetailScreen(
                     productId = productId,
                     onBackClick = { navController.popBackStack() },
+                    onBuyNowClick = { itemToBuy ->
+                        cartViewModel.setCheckoutItems(itemToBuy)
+                        navController.navigate("checkout")
+                    },
                     cartViewModel = cartViewModel
                 )
             }

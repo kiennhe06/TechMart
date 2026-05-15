@@ -31,7 +31,7 @@ import fpl.ph60001.techmart.ui.theme.*
 @Composable
 fun CartScreen(
     onBackClick: () -> Unit,
-    onCheckoutClick: () -> Unit,
+    onCheckoutClick: (List<CartItem>) -> Unit,
     viewModel: CartViewModel = viewModel()
 ) {
     val cartItems by viewModel.cartItems.collectAsState()
@@ -64,7 +64,7 @@ fun CartScreen(
             if (cartItems.isNotEmpty()) {
                 // Chỉ truyền những item được chọn xuống BottomBar để tính tiền
                 val selectedItems = cartItems.filter { selectedIds.contains(it.id) }
-                CartBottomBar(selectedItems, onCheckoutClick)
+                CartBottomBar(selectedItems) { onCheckoutClick(selectedItems) }
             }
         },
         containerColor = TechDark
