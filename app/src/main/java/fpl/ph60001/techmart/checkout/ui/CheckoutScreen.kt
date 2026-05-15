@@ -1,6 +1,5 @@
 package fpl.ph60001.techmart.checkout.ui
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,14 +19,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
 import coil.compose.AsyncImage
 import fpl.ph60001.techmart.cart.viewmodel.CartItem
 import fpl.ph60001.techmart.cart.viewmodel.CartViewModel
+import fpl.ph60001.techmart.network.ProvinceDto
+import fpl.ph60001.techmart.network.RetrofitClient
+import fpl.ph60001.techmart.network.WardDto
 import fpl.ph60001.techmart.ui.theme.*
+import fpl.ph60001.techmart.utils.PreferenceManager
+import kotlinx.coroutines.launch
+
+// Kiểm tra số điện thoại Việt Nam hợp lệ
+private fun isValidPhone(phone: String): Boolean {
+    return phone.matches(Regex("^(0[3|5|7|8|9])[0-9]{8}$"))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,25 +48,88 @@ fun CheckoutScreen(
     onOrderSuccess: () -> Unit,
     cartViewModel: CartViewModel
 ) {
+    val context = LocalContext.current
+    val prefManager = remember { PreferenceManager(context) }
+    val scope = rememberCoroutineScope()
     val cartItems by cartViewModel.checkoutItems.collectAsState()
 
     var selectedPayment by remember { mutableIntStateOf(0) }
     var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // Shipping address fields
-    var fullName by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-    // Calculate totals
+    // Thông tin giao hàng - auto-fill từ lần trước
+    var fullName by remember { mutableStateOf(prefManager.getShippingName()) }
+    var phone by remember { mutableStateOf(prefManager.getShippingPhone()) }
+    var addressDetail by remember { mutableStateOf(prefManager.getShippingAddressDetail()) }
+    var note by remember { mutableStateOf("") }
+    var phoneError by remember { mutableStateOf<String?>(null) }
+
+    // Dữ liệu địa chỉ từ API
+    var provinces by remember { mutableStateOf<List<ProvinceDto>>(emptyList()) }
+    var wards by remember { mutableStateOf<List<WardDto>>(emptyList()) }
+    var isLoadingProvinces by remember { mutableStateOf(true) }
+    var isLoadingWards by remember { mutableStateOf(false) }
+
+    // Lựa chọn hiện tại
+    var selectedProvince by remember { mutableStateOf<ProvinceDto?>(null) }
+    var selectedWard by remember { mutableStateOf<WardDto?>(null) }
+
+    // Trạng thái text search
+    var provinceQuery by remember { mutableStateOf("") }
+    var wardQuery by remember { mutableStateOf("") }
+
+    // Tên đã lưu từ lần trước (dùng để auto-fill)
+    val savedProvinceName = remember { prefManager.getShippingProvince() }
+    val savedWardName = remember { prefManager.getShippingWard() }
+
+    // Trạng thái dropdown
+    var expandedProvince by remember { mutableStateOf(false) }
+    var expandedWard by remember { mutableStateOf(false) }
+
+    // Tải danh sách tỉnh/thành khi mở màn hình
+    LaunchedEffect(Unit) {
+        try {
+            provinces = RetrofitClient.locationApiService.getProvinces()
+            // Auto-fill tỉnh từ lần trước
+            if (savedProvinceName.isNotEmpty()) {
+                val matched = provinces.find { it.name == savedProvinceName }
+                if (matched != null) {
+                    selectedProvince = matched
+                    provinceQuery = matched.name
+                    // Tải phường của tỉnh đã lưu
+                    val provinceDetail = RetrofitClient.locationApiService.getWardsByProvince(matched.code)
+                    wards = provinceDetail.wards ?: emptyList()
+                    // Auto-fill phường
+                    if (savedWardName.isNotEmpty()) {
+                        val matchedWard = wards.find { it.name == savedWardName }
+                        if (matchedWard != null) {
+                            selectedWard = matchedWard
+                            wardQuery = matchedWard.name
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isLoadingProvinces = false
+        }
+    }
+
+    // Tính tổng tiền
     val subtotal = cartItems.sumOf {
         val priceNum = it.price.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L
         priceNum * it.quantity
     }
     val shippingFee = if (subtotal > 500000) 0L else 30000L
     val total = subtotal + shippingFee
-    val formattedSubtotal = String.format("%,dđ", subtotal).replace(",", ".")
-    val formattedShipping = if (shippingFee == 0L) "Miễn phí" else String.format("%,dđ", shippingFee).replace(",", ".")
-    val formattedTotal = String.format("%,dđ", total).replace(",", ".")
+    val fmtSub = String.format("%,dđ", subtotal).replace(",", ".")
+    val fmtShip = if (shippingFee == 0L) "Miễn phí" else String.format("%,dđ", shippingFee).replace(",", ".")
+    val fmtTotal = String.format("%,dđ", total).replace(",", ".")
+
+    // Kiểm tra form hợp lệ
+    val isFormValid = fullName.isNotBlank() && isValidPhone(phone) &&
+            selectedProvince != null && selectedWard != null &&
+            addressDetail.isNotBlank() && cartItems.isNotEmpty()
 
     Scaffold(
         topBar = {
@@ -69,237 +144,254 @@ fun CheckoutScreen(
             )
         },
         bottomBar = {
-            CheckoutBottomBar(
-                total = formattedTotal,
-                enabled = fullName.isNotBlank() && phone.isNotBlank() && address.isNotBlank() && cartItems.isNotEmpty(),
-                onPlaceOrder = { showSuccessDialog = true }
-            )
+            CheckoutBottomBar(total = fmtTotal, enabled = isFormValid, onPlaceOrder = {
+                // Lưu thông tin giao hàng cho lần mua sau
+                prefManager.saveShippingInfo(
+                    fullName, phone,
+                    selectedProvince?.name ?: "",
+                    selectedWard?.name ?: "", addressDetail
+                )
+                showSuccessDialog = true
+            })
         },
         containerColor = TechDark
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(padding)
+                .verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Shipping Address Section
-            CheckoutSectionCard(
-                icon = Icons.Default.LocationOn,
-                title = "Địa chỉ nhận hàng"
-            ) {
+            // === 1. THÔNG TIN NHẬN HÀNG ===
+            SectionCard(Icons.Default.LocationOn, "Thông tin nhận hàng") {
+                // Họ và tên
                 OutlinedTextField(
-                    value = fullName,
-                    onValueChange = { fullName = it },
-                    label = { Text("Họ và tên") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = checkoutTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp)
+                    value = fullName, onValueChange = { fullName = it },
+                    label = { Text("Họ và tên *") }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Person, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                    modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                 )
                 Spacer(Modifier.height(8.dp))
+
+                // Số điện thoại
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Số điện thoại") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = checkoutTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp)
+                    onValueChange = {
+                        val filtered = it.filter { c -> c.isDigit() }.take(10)
+                        phone = filtered
+                        phoneError = when {
+                            filtered.isEmpty() -> null
+                            filtered.length < 10 -> "Số điện thoại cần 10 chữ số"
+                            !isValidPhone(filtered) -> "Số điện thoại không hợp lệ"
+                            else -> null
+                        }
+                    },
+                    label = { Text("Số điện thoại *") }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Phone, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                    isError = phoneError != null,
+                    supportingText = phoneError?.let { { Text(it, color = ErrorRed, fontSize = 12.sp) } },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    label = { Text("Địa chỉ chi tiết") },
-                    minLines = 2,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = checkoutTextFieldColors(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
 
-            // 2. Order Items Section
-            CheckoutSectionCard(
-                icon = Icons.Default.ShoppingBag,
-                title = "Sản phẩm đặt mua (${cartItems.size})"
-            ) {
-                cartItems.forEachIndexed { index, item ->
-                    CheckoutItemRow(item)
-                    if (index < cartItems.size - 1) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            color = TechDark.copy(alpha = 0.5f)
-                        )
+                // Gõ tìm Tỉnh/Thành phố
+                val filteredProvinces = remember(provinceQuery, provinces) {
+                    if (provinceQuery.isBlank() || provinceQuery == selectedProvince?.name) provinces
+                    else provinces.filter { it.name.contains(provinceQuery, ignoreCase = true) }
+                }
+                ExposedDropdownMenuBox(expanded = expandedProvince, onExpandedChange = { if (!isLoadingProvinces) expandedProvince = it }) {
+                    OutlinedTextField(
+                        value = provinceQuery,
+                        onValueChange = { provinceQuery = it; selectedProvince = null; selectedWard = null; expandedProvince = true },
+                        label = { Text(if (isLoadingProvinces) "Đang tải..." else "Tỉnh / Thành phố *") },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (isLoadingProvinces) {
+                                CircularProgressIndicator(Modifier.size(20.dp), color = BluePrimary, strokeWidth = 2.dp)
+                            } else {
+                                IconButton(onClick = {
+                                    if (provinceQuery.isNotEmpty()) {
+                                        provinceQuery = ""; selectedProvince = null
+                                    } else {
+                                        expandedProvince = !expandedProvince
+                                    }
+                                }) {
+                                    Icon(
+                                        if (provinceQuery.isNotEmpty()) Icons.Default.Clear else Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = TechGray
+                                    )
+                                }
+                            }
+                        },
+                        leadingIcon = { Icon(Icons.Default.LocationCity, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = filteredProvinces.isNotEmpty() && expandedProvince, 
+                        onDismissRequest = { expandedProvince = false }, 
+                        modifier = Modifier.exposedDropdownSize(), 
+                        containerColor = TechSlate
+                    ) {
+                            filteredProvinces.forEach { province ->
+                                DropdownMenuItem(text = { Text(province.name, color = WhitePure) }, onClick = {
+                                    selectedProvince = province; provinceQuery = province.name
+                                    selectedWard = null; wardQuery = ""
+                                    wards = emptyList()
+                                    expandedProvince = false
+                                    scope.launch {
+                                        isLoadingWards = true
+                                        try { 
+                                            wards = (RetrofitClient.locationApiService.getWardsByProvince(province.code)).wards ?: emptyList() 
+                                            if (wards.isNotEmpty()) expandedWard = true
+                                        }
+                                        catch (_: Exception) {} finally { isLoadingWards = false }
+                                    }
+                                })
+                            }
+                        }
+                    }
+                Spacer(Modifier.height(8.dp))
+
+                // Gõ tìm Phường/Xã
+                val filteredWards = remember(wardQuery, wards) {
+                    if (wardQuery.isBlank() || wardQuery == selectedWard?.name) wards
+                    else wards.filter { it.name.contains(wardQuery, ignoreCase = true) }
+                }
+                ExposedDropdownMenuBox(expanded = expandedWard, onExpandedChange = { if (selectedProvince != null && !isLoadingWards) expandedWard = it }) {
+                    OutlinedTextField(
+                        value = wardQuery,
+                        onValueChange = { wardQuery = it; selectedWard = null; expandedWard = true },
+                        label = { Text(if (isLoadingWards) "Đang tải..." else "Phường / Xã *") },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (isLoadingWards) {
+                                CircularProgressIndicator(Modifier.size(20.dp), color = BluePrimary, strokeWidth = 2.dp)
+                            } else {
+                                IconButton(onClick = {
+                                    if (wardQuery.isNotEmpty()) {
+                                        wardQuery = ""; selectedWard = null
+                                    } else {
+                                        expandedWard = !expandedWard
+                                    }
+                                }) {
+                                    Icon(
+                                        if (wardQuery.isNotEmpty()) Icons.Default.Clear else Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = TechGray
+                                    )
+                                }
+                            }
+                        },
+                        leadingIcon = { Icon(Icons.Default.Place, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                        enabled = selectedProvince != null,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = filteredWards.isNotEmpty() && expandedWard, 
+                        onDismissRequest = { expandedWard = false }, 
+                        modifier = Modifier.exposedDropdownSize(), 
+                        containerColor = TechSlate
+                    ) {
+                        filteredWards.forEach { ward ->
+                            DropdownMenuItem(text = { Text(ward.name, color = WhitePure) }, onClick = {
+                                selectedWard = ward; wardQuery = ward.name; expandedWard = false
+                            })
+                        }
                     }
                 }
-            }
+                Spacer(Modifier.height(8.dp))
 
-            // 3. Payment Method Section
-            CheckoutSectionCard(
-                icon = Icons.Default.Payment,
-                title = "Phương thức thanh toán"
-            ) {
-                PaymentMethodOption(
-                    icon = Icons.Default.Money,
-                    label = "Thanh toán khi nhận hàng (COD)",
-                    selected = selectedPayment == 0,
-                    onClick = { selectedPayment = 0 }
+                // Số nhà, tên đường
+                OutlinedTextField(
+                    value = addressDetail, onValueChange = { addressDetail = it },
+                    label = { Text("Số nhà, tên đường *") }, singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Home, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                    modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                 )
                 Spacer(Modifier.height(8.dp))
-                PaymentMethodOption(
-                    icon = Icons.Default.AccountBalance,
-                    label = "Chuyển khoản ngân hàng",
-                    selected = selectedPayment == 1,
-                    onClick = { selectedPayment = 1 }
-                )
-                Spacer(Modifier.height(8.dp))
-                PaymentMethodOption(
-                    icon = Icons.Default.CreditCard,
-                    label = "Thẻ tín dụng / Ghi nợ",
-                    selected = selectedPayment == 2,
-                    onClick = { selectedPayment = 2 }
+
+                // Ghi chú
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it },
+                    label = { Text("Ghi chú cho người bán") }, minLines = 2,
+                    leadingIcon = { Icon(Icons.Default.Edit, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+                    modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                 )
             }
 
-            // 4. Order Summary Section
-            CheckoutSectionCard(
-                icon = Icons.Default.Receipt,
-                title = "Chi tiết thanh toán"
-            ) {
-                SummaryRow("Tạm tính", formattedSubtotal)
+            // === 2. SẢN PHẨM ĐẶT MUA ===
+            SectionCard(Icons.Default.ShoppingBag, "Sản phẩm đặt mua (${cartItems.size})") {
+                cartItems.forEachIndexed { i, item ->
+                    CheckoutItemRow(item)
+                    if (i < cartItems.size - 1) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = TechDark.copy(0.5f))
+                }
+            }
+
+            // === 3. PHƯƠNG THỨC THANH TOÁN ===
+            SectionCard(Icons.Default.Payment, "Phương thức thanh toán") {
+                PaymentOption(Icons.Default.Money, "Thanh toán khi nhận hàng (COD)", selectedPayment == 0) { selectedPayment = 0 }
+                Spacer(Modifier.height(8.dp))
+                PaymentOption(Icons.Default.AccountBalance, "Chuyển khoản ngân hàng", selectedPayment == 1) { selectedPayment = 1 }
+                Spacer(Modifier.height(8.dp))
+                PaymentOption(Icons.Default.CreditCard, "Thẻ tín dụng / Ghi nợ", selectedPayment == 2) { selectedPayment = 2 }
+            }
+
+            // === 4. CHI TIẾT THANH TOÁN ===
+            SectionCard(Icons.Default.Receipt, "Chi tiết thanh toán") {
+                SummaryRow("Tạm tính", fmtSub)
                 Spacer(Modifier.height(4.dp))
-                SummaryRow("Phí vận chuyển", formattedShipping)
+                SummaryRow("Phí vận chuyển", fmtShip)
                 if (shippingFee == 0L) {
-                    Text(
-                        "Miễn phí vận chuyển cho đơn trên 500.000đ",
-                        color = CyberCyan,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                    )
+                    Text("Miễn phí vận chuyển cho đơn trên 500.000đ", color = CyberCyan,
+                        style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
                 }
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = TechDark.copy(alpha = 0.5f)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Tổng thanh toán",
-                        color = WhitePure,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        formattedTotal,
-                        color = BluePrimary,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 20.sp
-                    )
+                HorizontalDivider(Modifier.padding(vertical = 8.dp), color = TechDark.copy(0.5f))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tổng thanh toán", color = WhitePure, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(fmtTotal, color = BluePrimary, fontWeight = FontWeight.Black, fontSize = 20.sp)
                 }
             }
-
             Spacer(Modifier.height(8.dp))
         }
     }
 
-    // Success Dialog
+    // Dialog đặt hàng thành công
     if (showSuccessDialog) {
         AlertDialog(
-            onDismissRequest = {},
-            containerColor = TechSlate,
+            onDismissRequest = {}, containerColor = TechSlate,
             icon = {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(listOf(BluePrimary, CyberCyan))
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = WhitePure,
-                        modifier = Modifier.size(40.dp)
-                    )
+                Box(Modifier.size(64.dp).clip(CircleShape).background(Brush.linearGradient(listOf(BluePrimary, CyberCyan))), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.CheckCircle, null, tint = WhitePure, modifier = Modifier.size(40.dp))
                 }
             },
-            title = {
-                Text(
-                    "Đặt hàng thành công!",
-                    color = WhitePure,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            },
+            title = { Text("Đặt hàng thành công!", color = WhitePure, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "Cảm ơn bạn đã mua hàng tại TechMart",
-                        color = TechGray,
-                        fontSize = 14.sp
-                    )
+                    Text("Cảm ơn bạn đã mua hàng tại TechMart", color = TechGray, fontSize = 14.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Đơn hàng của bạn sẽ được xử lý trong thời gian sớm nhất.",
-                        color = TechGray,
-                        fontSize = 14.sp
-                    )
+                    Text("Đơn hàng của bạn sẽ được xử lý trong thời gian sớm nhất.", color = TechGray, fontSize = 14.sp)
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        cartViewModel.clearCart()
-                        onOrderSuccess()
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BluePrimary),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Về trang chủ", fontWeight = FontWeight.Bold)
-                }
+                Button(onClick = { cartViewModel.clearCart(); onOrderSuccess() },
+                    shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = BluePrimary), modifier = Modifier.fillMaxWidth()
+                ) { Text("Về trang chủ", fontWeight = FontWeight.Bold) }
             }
         )
     }
 }
 
+// --- CÁC COMPOSABLE PHỤ TRỢ ---
+
 @Composable
-private fun CheckoutSectionCard(
-    icon: ImageVector,
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = TechSlate),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 12.dp)
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = BluePrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+private fun SectionCard(icon: ImageVector, title: String, content: @Composable ColumnScope.() -> Unit) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = TechSlate), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                Icon(icon, null, tint = BluePrimary, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    title,
-                    color = WhitePure,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Text(title, color = WhitePure, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
             content()
         }
@@ -308,138 +400,52 @@ private fun CheckoutSectionCard(
 
 @Composable
 private fun CheckoutItemRow(item: CartItem) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        AsyncImage(
-            model = item.image,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(TechDark)
-        )
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        AsyncImage(model = item.image, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(TechDark))
         Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                item.name,
-                color = WhitePure,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontSize = 14.sp
-            )
-            Text(
-                item.price,
-                color = BluePrimary,
-                fontSize = 13.sp
-            )
+        Column(Modifier.weight(1f)) {
+            Text(item.name, color = WhitePure, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+            Text(item.price, color = BluePrimary, fontSize = 13.sp)
         }
-        Text(
-            "x${item.quantity}",
-            color = TechGray,
-            fontWeight = FontWeight.Medium,
-            fontSize = 14.sp
-        )
+        Text("x${item.quantity}", color = TechGray, fontWeight = FontWeight.Medium, fontSize = 14.sp)
     }
 }
 
 @Composable
-private fun PaymentMethodOption(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val borderColor = if (selected) BluePrimary else TechDark
-    val bgColor = if (selected) BluePrimary.copy(alpha = 0.1f) else Color.Transparent
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(bgColor)
-            .border(1.5.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(12.dp)
+private fun PaymentOption(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (selected) BluePrimary.copy(alpha = 0.1f) else Color.Transparent)
+            .border(1.5.dp, if (selected) BluePrimary else TechDark, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(12.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (selected) BluePrimary else TechGray,
-            modifier = Modifier.size(24.dp)
-        )
+        Icon(icon, null, tint = if (selected) BluePrimary else TechGray, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(12.dp))
-        Text(
-            label,
-            color = if (selected) WhitePure else TechGray,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            colors = RadioButtonDefaults.colors(
-                selectedColor = BluePrimary,
-                unselectedColor = TechGray
-            )
-        )
+        Text(label, color = if (selected) WhitePure else TechGray, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.weight(1f))
+        RadioButton(selected, onClick, colors = RadioButtonDefaults.colors(selectedColor = BluePrimary, unselectedColor = TechGray))
     }
 }
 
 @Composable
 private fun SummaryRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, color = TechGray, fontSize = 14.sp)
-        Text(value, color = WhitePure, fontSize = 14.sp)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = TechGray, fontSize = 14.sp); Text(value, color = WhitePure, fontSize = 14.sp)
     }
 }
 
 @Composable
-private fun CheckoutBottomBar(
-    total: String,
-    enabled: Boolean,
-    onPlaceOrder: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = TechDark,
-        border = androidx.compose.foundation.BorderStroke(1.dp, TechSlate)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .navigationBarsPadding(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+private fun CheckoutBottomBar(total: String, enabled: Boolean, onPlaceOrder: () -> Unit) {
+    Surface(Modifier.fillMaxWidth(), color = TechDark, border = androidx.compose.foundation.BorderStroke(1.dp, TechSlate)) {
+        Row(Modifier.padding(16.dp).navigationBarsPadding(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f)) {
                 Text("Tổng thanh toán", color = TechGray, fontSize = 12.sp)
-                Text(
-                    total,
-                    color = BluePrimary,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 20.sp
-                )
+                Text(total, color = BluePrimary, fontWeight = FontWeight.Black, fontSize = 20.sp)
             }
-            Button(
-                onClick = onPlaceOrder,
-                enabled = enabled,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BluePrimary,
-                    disabledContainerColor = TechGray.copy(alpha = 0.3f)
-                )
+            Button(onClick = onPlaceOrder, enabled = enabled, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BluePrimary, disabledContainerColor = TechGray.copy(alpha = 0.3f))
             ) {
-                Icon(Icons.Default.ShoppingCartCheckout, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ShoppingCartCheckout, null); Spacer(Modifier.width(8.dp))
                 Text("Đặt hàng", fontWeight = FontWeight.Bold)
             }
         }
@@ -447,12 +453,10 @@ private fun CheckoutBottomBar(
 }
 
 @Composable
-private fun checkoutTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = WhitePure,
-    unfocusedTextColor = WhitePure,
-    cursorColor = BluePrimary,
-    focusedBorderColor = BluePrimary,
-    unfocusedBorderColor = TechDark,
-    focusedLabelColor = BluePrimary,
-    unfocusedLabelColor = TechGray
+private fun tfColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = WhitePure, unfocusedTextColor = WhitePure, cursorColor = BluePrimary,
+    focusedBorderColor = BluePrimary, unfocusedBorderColor = TechDark,
+    focusedLabelColor = BluePrimary, unfocusedLabelColor = TechGray,
+    disabledTextColor = TechGray, disabledBorderColor = TechDark.copy(0.5f), disabledLabelColor = TechGray.copy(0.5f),
+    errorBorderColor = ErrorRed, errorLabelColor = ErrorRed
 )

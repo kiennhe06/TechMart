@@ -1,0 +1,197 @@
+--- app/src/main/java/fpl/ph60001/techmart/checkout/ui/CheckoutScreen.kt
++++ app/src/main/java/fpl/ph60001/techmart/checkout/ui/CheckoutScreen.kt
+@@ -66,35 +66,27 @@
+ 
+     // Dữ liệu địa chỉ từ API
+     var provinces by remember { mutableStateOf<List<ProvinceDto>>(emptyList()) }
+-    var districts by remember { mutableStateOf<List<DistrictDto>>(emptyList()) }
+     var wards by remember { mutableStateOf<List<WardDto>>(emptyList()) }
+     var isLoadingProvinces by remember { mutableStateOf(true) }
+-    var isLoadingDistricts by remember { mutableStateOf(false) }
+     var isLoadingWards by remember { mutableStateOf(false) }
+ 
+     // Lựa chọn hiện tại
+     var selectedProvince by remember { mutableStateOf<ProvinceDto?>(null) }
+-    var selectedDistrict by remember { mutableStateOf<DistrictDto?>(null) }
+     var selectedWard by remember { mutableStateOf<WardDto?>(null) }
+ 
+     // Trạng thái text search
+     var provinceQuery by remember { mutableStateOf("") }
+-    var districtQuery by remember { mutableStateOf("") }
+     var wardQuery by remember { mutableStateOf("") }
+ 
+     // Tên đã lưu từ lần trước (dùng để auto-fill)
+     val savedProvinceName = remember { prefManager.getShippingProvince() }
+-    val savedDistrictName = remember { prefManager.getShippingDistrict() }
+     val savedWardName = remember { prefManager.getShippingWard() }
+ 
+     // Trạng thái dropdown
+     var expandedProvince by remember { mutableStateOf(false) }
+-    var expandedDistrict by remember { mutableStateOf(false) }
+     var expandedWard by remember { mutableStateOf(false) }
+ 
+     // Tải danh sách tỉnh/thành khi mở màn hình
+     LaunchedEffect(Unit) {
+         try {
+             provinces = RetrofitClient.locationApiService.getProvinces()
+             // Auto-fill tỉnh từ lần trước
+@@ -103,24 +95,16 @@
+                 if (matched != null) {
+                     selectedProvince = matched
+                     provinceQuery = matched.name
+-                    // Tải quận của tỉnh đã lưu
+-                    val provinceDetail = RetrofitClient.locationApiService.getDistricts(matched.code)
+-                    districts = provinceDetail.districts ?: emptyList()
+-                    // Auto-fill quận
+-                    if (savedDistrictName.isNotEmpty()) {
+-                        val matchedDist = districts.find { it.name == savedDistrictName }
+-                        if (matchedDist != null) {
+-                            selectedDistrict = matchedDist
+-                            districtQuery = matchedDist.name
+-                            // Tải phường của quận đã lưu
+-                            val districtDetail = RetrofitClient.locationApiService.getWards(matchedDist.code)
+-                            wards = districtDetail.wards ?: emptyList()
+-                            // Auto-fill phường
+-                            if (savedWardName.isNotEmpty()) {
+-                                selectedWard = wards.find { it.name == savedWardName }
+-                                wardQuery = selectedWard?.name ?: ""
+-                            }
+-                        }
++                    // Tải phường xã của tỉnh đã lưu
++                    val provinceDetail = RetrofitClient.locationApiService.getWardsByProvince(matched.code)
++                    wards = provinceDetail.wards ?: emptyList()
++                    // Auto-fill phường
++                    if (savedWardName.isNotEmpty()) {
++                        val matchedWard = wards.find { it.name == savedWardName }
++                        if (matchedWard != null) {
++                            selectedWard = matchedWard
++                            wardQuery = matchedWard.name
++                        }
+                     }
+                 }
+             }
+@@ -144,7 +128,7 @@
+ 
+     // Kiểm tra form hợp lệ
+     val isFormValid = fullName.isNotBlank() && isValidPhone(phone) &&
+-            selectedProvince != null && selectedDistrict != null && selectedWard != null &&
++            selectedProvince != null && selectedWard != null &&
+             addressDetail.isNotBlank() && cartItems.isNotEmpty()
+ 
+     Scaffold(
+@@ -164,8 +148,8 @@
+                 // Lưu thông tin giao hàng cho lần mua sau
+                 prefManager.saveShippingInfo(
+                     fullName, phone,
+-                    selectedProvince?.name ?: "", selectedDistrict?.name ?: "",
+-                    selectedWard?.name ?: "", addressDetail
++                    selectedProvince?.name ?: "",
++                    selectedWard?.name ?: "", 
++                    addressDetail
+                 )
+                 showSuccessDialog = true
+             })
+@@ -218,7 +202,7 @@
+                 ExposedDropdownMenuBox(expanded = expandedProvince, onExpandedChange = { if (!isLoadingProvinces) expandedProvince = it }) {
+                     OutlinedTextField(
+                         value = provinceQuery,
+-                        onValueChange = { provinceQuery = it; selectedProvince = null; selectedDistrict = null; selectedWard = null; expandedProvince = true },
++                        onValueChange = { provinceQuery = it; selectedProvince = null; selectedWard = null; expandedProvince = true },
+                         label = { Text(if (isLoadingProvinces) "Đang tải..." else "Tỉnh / Thành phố *") },
+                         singleLine = true,
+                         trailingIcon = {
+@@ -247,56 +231,16 @@
+                             filteredProvinces.forEach { province ->
+                                 DropdownMenuItem(text = { Text(province.name, color = WhitePure) }, onClick = {
+                                     selectedProvince = province; provinceQuery = province.name
+-                                    selectedDistrict = null; districtQuery = ""
+                                     selectedWard = null; wardQuery = ""
+-                                    districts = emptyList(); wards = emptyList()
++                                    wards = emptyList()
+                                     expandedProvince = false
+                                     scope.launch {
+-                                        isLoadingDistricts = true
++                                        isLoadingWards = true
+                                         try { 
+-                                            districts = (RetrofitClient.locationApiService.getDistricts(province.code)).districts ?: emptyList() 
+-                                            if (districts.isNotEmpty()) expandedDistrict = true
++                                            wards = (RetrofitClient.locationApiService.getWardsByProvince(province.code)).wards ?: emptyList() 
++                                            if (wards.isNotEmpty()) expandedWard = true
+                                         }
+-                                        catch (_: Exception) {} finally { isLoadingDistricts = false }
+-                                    }
+-                                })
+-                            }
+-                        }
+-                    }
+-                }
+-                Spacer(Modifier.height(8.dp))
+-
+-                // Gõ tìm Quận/Huyện
+-                val filteredDistricts = remember(districtQuery, districts) {
+-                    if (districtQuery.isBlank() || districtQuery == selectedDistrict?.name) districts
+-                    else districts.filter { it.name.contains(districtQuery, ignoreCase = true) }
+-                }
+-                ExposedDropdownMenuBox(expanded = expandedDistrict, onExpandedChange = { if (selectedProvince != null && !isLoadingDistricts) expandedDistrict = it }) {
+-                    OutlinedTextField(
+-                        value = districtQuery,
+-                        onValueChange = { districtQuery = it; selectedDistrict = null; selectedWard = null; expandedDistrict = true },
+-                        label = { Text(if (isLoadingDistricts) "Đang tải..." else "Quận / Huyện *") },
+-                        singleLine = true,
+-                        trailingIcon = {
+-                            if (isLoadingDistricts) {
+-                                CircularProgressIndicator(Modifier.size(20.dp), color = BluePrimary, strokeWidth = 2.dp)
+-                            } else {
+-                                IconButton(onClick = {
+-                                    if (districtQuery.isNotEmpty()) {
+-                                        districtQuery = ""; selectedDistrict = null
+-                                    } else {
+-                                        expandedDistrict = !expandedDistrict
+-                                    }
+-                                }) {
+-                                    Icon(
+-                                        if (districtQuery.isNotEmpty()) Icons.Default.Clear else Icons.Default.ArrowDropDown,
+-                                        contentDescription = null,
+-                                        tint = TechGray
+-                                    )
+-                                }
+-                            }
+-                        },
+-                        leadingIcon = { Icon(Icons.Default.Map, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+-                        enabled = selectedProvince != null,
+-                        modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+-                    )
+-                    if (filteredDistricts.isNotEmpty() && expandedDistrict) {
+-                        DropdownMenu(expanded = true, onDismissRequest = { expandedDistrict = false }, modifier = Modifier.exposedDropdownSize(), containerColor = TechSlate, properties = androidx.compose.ui.window.PopupProperties(focusable = false)) {
+-                            filteredDistricts.forEach { district ->
+-                                DropdownMenuItem(text = { Text(district.name, color = WhitePure) }, onClick = {
+-                                    selectedDistrict = district; districtQuery = district.name
+-                                    selectedWard = null; wardQuery = ""; wards = emptyList(); expandedDistrict = false
+-                                    scope.launch {
+-                                        isLoadingWards = true
+-                                        try { 
+-                                            wards = (RetrofitClient.locationApiService.getWards(district.code)).wards ?: emptyList() 
+-                                            if (wards.isNotEmpty()) expandedWard = true
+-                                        }
+-                                        catch (_: Exception) {} finally { isLoadingWards = false }
++                                        catch (_: Exception) {} finally { isLoadingWards = false }
+                                     }
+                                 })
+                             }
+@@ -314,7 +258,7 @@
+                     if (wardQuery.isBlank() || wardQuery == selectedWard?.name) wards
+                     else wards.filter { it.name.contains(wardQuery, ignoreCase = true) }
+                 }
+-                ExposedDropdownMenuBox(expanded = expandedWard, onExpandedChange = { if (selectedDistrict != null && !isLoadingWards) expandedWard = it }) {
++                ExposedDropdownMenuBox(expanded = expandedWard, onExpandedChange = { if (selectedProvince != null && !isLoadingWards) expandedWard = it }) {
+                     OutlinedTextField(
+                         value = wardQuery,
+                         onValueChange = { wardQuery = it; selectedWard = null; expandedWard = true },
+@@ -339,7 +283,7 @@
+                             }
+                         },
+                         leadingIcon = { Icon(Icons.Default.Place, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
+-                        enabled = selectedDistrict != null,
++                        enabled = selectedProvince != null,
+                         modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+                     )
