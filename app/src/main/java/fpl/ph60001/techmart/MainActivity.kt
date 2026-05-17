@@ -56,6 +56,10 @@ import fpl.ph60001.techmart.order.ui.OrderHistoryScreen
 import fpl.ph60001.techmart.order.ui.OrderDetailScreen
 import fpl.ph60001.techmart.ui.theme.*
 import fpl.ph60001.techmart.utils.PreferenceManager
+import fpl.ph60001.techmart.network.RetrofitClient
+import fpl.ph60001.techmart.network.LoginRequest
+import fpl.ph60001.techmart.network.RegisterRequest
+import fpl.ph60001.techmart.network.SocialLoginRequest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -104,11 +108,25 @@ fun TechMartApp(callbackManager: CallbackManager) {
         LoginManager.getInstance().registerCallback(callbackManager, object : FacebookCallback<LoginResult> {
             override fun onSuccess(result: LoginResult) {
                 scope.launch {
-                    val credential = FacebookAuthProvider.getCredential(result.accessToken.token)
-                    Firebase.auth.signInWithCredential(credential).await()
-                    Toast.makeText(context, "Đăng nhập Facebook thành công!", Toast.LENGTH_SHORT).show()
-                    navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                    try {
+                        val credential = FacebookAuthProvider.getCredential(result.accessToken.token)
+                        val authResult = Firebase.auth.signInWithCredential(credential).await()
+                        val user = authResult.user
+                        if (user != null) {
+                            val name = user.displayName ?: "Facebook User"
+                            val email = user.email ?: "${user.uid}@facebook.com"
+                            val response = RetrofitClient.apiService.socialLogin(SocialLoginRequest(name, email))
+                            if (response.isSuccessful) {
+                                preferenceManager.saveLoginState(true, email)
+                                preferenceManager.saveShippingInfo(name, "", preferenceManager.getShippingProvince(), preferenceManager.getShippingWard(), preferenceManager.getShippingAddressDetail())
+                            }
+                        }
+                        Toast.makeText(context, "Đăng nhập Facebook thành công!", Toast.LENGTH_SHORT).show()
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Lỗi kết nối Facebook", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -131,6 +149,20 @@ fun TechMartApp(callbackManager: CallbackManager) {
                 scope.launch {
                     val signInResult = googleAuthUiClient.signInWithGoogle(result.data ?: return@launch)
                     if (signInResult.isSuccess) {
+                        try {
+                            val user = Firebase.auth.currentUser
+                            if (user != null) {
+                                val name = user.displayName ?: "Google User"
+                                val email = user.email ?: "${user.uid}@google.com"
+                                val response = RetrofitClient.apiService.socialLogin(SocialLoginRequest(name, email))
+                                if (response.isSuccessful) {
+                                    preferenceManager.saveLoginState(true, email)
+                                    preferenceManager.saveShippingInfo(name, "", preferenceManager.getShippingProvince(), preferenceManager.getShippingWard(), preferenceManager.getShippingAddressDetail())
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Bỏ qua lỗi backend, vẫn cho phép đăng nhập local
+                        }
                         Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
                         navController.navigate("home") {
                             popUpTo("login") { inclusive = true }
@@ -235,10 +267,42 @@ fun TechMartApp(callbackManager: CallbackManager) {
                 LoginScreen(
                     onLoginClick = { email, password, rememberMe ->
                         if (email.isNotEmpty() && password.isNotEmpty()) {
-                            preferenceManager.saveLoginState(rememberMe, email)
-                            Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                            navController.navigate("home") {
-                                popUpTo("login") { inclusive = true }
+                            scope.launch {
+                                try {
+                                    val response = RetrofitClient.apiService.login(LoginRequest(email, password))
+                                    if (response.isSuccessful && response.body() != null) {
+                                        val authResp = response.body()!!
+                                        if (authResp.error != null) {
+                                            Toast.makeText(context, authResp.error, Toast.LENGTH_LONG).show()
+                                        } else {
+                                            val loggedInUser = authResp.user
+                                            preferenceManager.saveLoginState(rememberMe, loggedInUser?.email)
+                                            if (loggedInUser != null) {
+                                                preferenceManager.saveShippingInfo(
+                                                    loggedInUser.name,
+                                                    loggedInUser.phone,
+                                                    preferenceManager.getShippingProvince(),
+                                                    preferenceManager.getShippingWard(),
+                                                    preferenceManager.getShippingAddressDetail()
+                                                )
+                                            }
+                                            Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+                                            navController.navigate("home") {
+                                                popUpTo("login") { inclusive = true }
+                                            }
+                                        }
+                                    } else {
+                                        val errorMsg = response.errorBody()?.string() ?: ""
+                                        val errorJson = try {
+                                            org.json.JSONObject(errorMsg).getString("error")
+                                        } catch (e: Exception) {
+                                            "Tài khoản hoặc mật khẩu không chính xác"
+                                        }
+                                        Toast.makeText(context, errorJson, Toast.LENGTH_LONG).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Lỗi kết nối máy chủ: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         } else {
                             Toast.makeText(context, "Vui lòng nhập đầy đủ thông tin", Toast.LENGTH_SHORT).show()
@@ -264,8 +328,32 @@ fun TechMartApp(callbackManager: CallbackManager) {
                 RegisterScreen(
                     onRegisterClick = { name, email, phone, password ->
                         if (name.isNotEmpty() && email.isNotEmpty() && phone.isNotEmpty() && password.isNotEmpty()) {
-                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
-                            navController.popBackStack()
+                            scope.launch {
+                                try {
+                                    val response = RetrofitClient.apiService.register(
+                                        RegisterRequest(name, email, phone, password)
+                                    )
+                                    if (response.isSuccessful && response.body() != null) {
+                                        val authResp = response.body()!!
+                                        if (authResp.error != null) {
+                                            Toast.makeText(context, authResp.error, Toast.LENGTH_LONG).show()
+                                        } else {
+                                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                                            navController.popBackStack()
+                                        }
+                                    } else {
+                                        val errorMsg = response.errorBody()?.string() ?: ""
+                                        val errorJson = try {
+                                            org.json.JSONObject(errorMsg).getString("error")
+                                        } catch (e: Exception) {
+                                            "Email hoặc số điện thoại đã được đăng ký"
+                                        }
+                                        Toast.makeText(context, errorJson, Toast.LENGTH_LONG).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Lỗi kết nối máy chủ: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
+                            }
                         } else {
                             Toast.makeText(context, "Vui lòng điền đầy đủ các trường", Toast.LENGTH_SHORT).show()
                         }
@@ -369,6 +457,7 @@ fun TechMartApp(callbackManager: CallbackManager) {
                         Firebase.auth.signOut()
                         LoginManager.getInstance().logOut()
                         preferenceManager.clearLoginState()
+                        fpl.ph60001.techmart.order.OrderRepository(context).clearLocalOrders()
                         Toast.makeText(context, "Đã đăng xuất", Toast.LENGTH_SHORT).show()
                         navController.navigate("login") {
                             popUpTo(0) { inclusive = true }

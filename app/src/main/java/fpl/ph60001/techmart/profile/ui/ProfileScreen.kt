@@ -27,6 +27,13 @@ import com.google.firebase.ktx.Firebase
 import fpl.ph60001.techmart.ui.theme.*
 import kotlin.text.take
 import kotlin.text.uppercase
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import fpl.ph60001.techmart.utils.PreferenceManager
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +44,24 @@ fun ProfileScreen(
     onOrderHistoryClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val prefManager = remember { PreferenceManager(context) }
     val user = Firebase.auth.currentUser
+    
+    val localName = prefManager.getShippingName()
+    val localEmail = prefManager.getSavedEmail()
+    
+    val displayName = user?.displayName?.takeIf { it.isNotBlank() } ?: localName.takeIf { it.isNotBlank() } ?: "Người dùng TechMart"
+    val displayEmail = user?.email?.takeIf { it.isNotBlank() } ?: localEmail?.takeIf { it.isNotBlank() } ?: "Chưa cập nhật email"
+    
+    var avatarUri by remember { mutableStateOf(user?.photoUrl?.toString() ?: prefManager.getAvatar()) }
+    
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let {
+            avatarUri = it.toString()
+            prefManager.saveAvatar(it.toString())
+        }
+    }
 
     // Biến trạng thái để kiểm soát việc hiển thị thông báo xác nhận đăng xuất
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -70,29 +94,39 @@ fun ProfileScreen(
                         brush = Brush.linearGradient(
                             colors = listOf(BluePrimary, CyberCyan)
                         )
-                    ),
+                    )
+                    .clickable { launcher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = user?.displayName?.take(1)?.uppercase() ?: user?.email?.take(1)?.uppercase() ?: "T",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        color = WhitePure,
-                        fontWeight = FontWeight.Bold
+                if (avatarUri != null) {
+                    AsyncImage(
+                        model = avatarUri,
+                        contentDescription = "Avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
                     )
-                )
+                } else {
+                    Text(
+                        text = displayName.take(1).uppercase(),
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            color = WhitePure,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = user?.displayName ?: "Người dùng TechMart",
+                text = displayName,
                 style = MaterialTheme.typography.titleLarge.copy(
                     color = WhitePure,
                     fontWeight = FontWeight.Bold
                 )
             )
             Text(
-                text = user?.email ?: "Chưa cập nhật email",
+                text = displayEmail,
                 style = MaterialTheme.typography.bodyMedium.copy(color = TechGray)
             )
 

@@ -35,7 +35,7 @@ import java.util.*
 fun OrderHistoryScreen(onBackClick: () -> Unit, onOrderClick: (String) -> Unit) {
     val context = LocalContext.current
     val prefManager = remember { PreferenceManager(context) }
-    val userPhone = remember { prefManager.getShippingPhone() }
+    val userEmail = remember { prefManager.getSavedEmail() ?: "" }
     
     var orders by remember { mutableStateOf<List<Order>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -45,41 +45,15 @@ fun OrderHistoryScreen(onBackClick: () -> Unit, onOrderClick: (String) -> Unit) 
         val localOrders = orderRepo.getOrders()
         
         try {
-            // 1. Lấy toàn bộ đơn hàng từ server
-            val serverOrders = RetrofitClient.apiService.getOrders()
-            
-            // 2. Gộp dữ liệu: Nếu đơn hàng có trên server, lấy trạng thái từ server. 
-            // Nếu chỉ có ở local, vẫn giữ lại để hiển thị.
-            val mergedOrders = mutableListOf<Order>()
-            val serverOrderMap = serverOrders.associateBy { it.id }
-            
-            // Ưu tiên các đơn hàng từ server có cùng số điện thoại
-            serverOrders.filter { it.customerPhone == userPhone }.forEach { 
-                mergedOrders.add(it)
-            }
-            
-            // Thêm các đơn hàng local mà chưa có trong danh sách server (hoặc khác ID)
-            localOrders.forEach { local ->
-                val serverVersion = serverOrderMap[local.id]
-                if (serverVersion != null) {
-                    // Nếu trùng ID, dùng bản server để có status mới nhất
-                    if (mergedOrders.none { it.id == local.id }) {
-                        mergedOrders.add(serverVersion)
-                    }
-                } else {
-                    // Nếu local có mà server không có (chưa sync xong), vẫn hiện local
-                    if (mergedOrders.none { it.id == local.id }) {
-                        mergedOrders.add(local)
-                    }
-                }
-            }
+            // 1. Lấy đơn hàng từ server dựa theo email
+            val serverOrders = if (userEmail.isNotBlank()) RetrofitClient.apiService.getOrdersByEmail(userEmail) else emptyList()
             
             // Sắp xếp theo ngày mới nhất
-            orders = mergedOrders.sortedByDescending { it.orderDate }
+            orders = serverOrders.sortedByDescending { it.orderDate }
             
         } catch (e: Exception) {
-            // Nếu lỗi mạng, hiển thị dữ liệu local và thông báo
-            orders = localOrders.sortedByDescending { it.orderDate }
+            // Nếu lỗi mạng, hiển thị dữ liệu local và lọc theo đúng email
+            orders = localOrders.filter { it.customerEmail == userEmail }.sortedByDescending { it.orderDate }
             android.widget.Toast.makeText(context, "Không thể đồng bộ với máy chủ. Đang hiển thị offline.", android.widget.Toast.LENGTH_SHORT).show()
         } finally {
             isLoading = false

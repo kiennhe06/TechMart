@@ -61,6 +61,37 @@ data class SpecificationDto(
     val value: String
 )
 
+// User Request & Response Models
+data class RegisterRequest(
+    val name: String,
+    val email: String,
+    val phone: String,
+    val password: String
+)
+
+data class LoginRequest(
+    val email: String,
+    val password: String
+)
+
+data class SocialLoginRequest(
+    val name: String,
+    val email: String
+)
+
+data class UserProfile(
+    val id: String,
+    val name: String,
+    val email: String,
+    val phone: String
+)
+
+data class AuthResponse(
+    val message: String,
+    val user: UserProfile?,
+    val error: String? = null
+)
+
 interface ApiService {
     @GET("api/home-data")
     suspend fun getHomeData(): HomeDataResponse
@@ -74,9 +105,24 @@ interface ApiService {
     @GET("api/orders")
     suspend fun getOrders(): List<Order>
 
+    @GET("api/orders/user/{email}")
+    suspend fun getOrdersByEmail(@Path("email") email: String): List<Order>
+
     @PATCH("api/orders/{id}/cancel")
     suspend fun cancelOrder(@Path("id") id: String): Response<Unit>
 
     @POST("api/orders/{id}/review")
     suspend fun submitReview(@Path("id") id: String, @Body review: fpl.ph60001.techmart.order.OrderReview): Response<Unit>
+
+    @POST("users/register")
+    suspend fun register(@Body request: RegisterRequest): Response<AuthResponse>
+
+    @POST("users/login")
+    suspend fun login(@Body request: LoginRequest): Response<AuthResponse>
+
+    @POST("users/social-login")
+    suspend fun socialLogin(@Body request: SocialLoginRequest): Response<AuthResponse>
+
+    @GET("users/profile/{email}")
+    suspend fun getUserProfile(@Path("email") email: String): Response<AuthResponse>
 }

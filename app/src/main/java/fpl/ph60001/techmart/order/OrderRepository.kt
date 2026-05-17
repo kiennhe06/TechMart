@@ -25,6 +25,7 @@ data class Order(
     val address: String,
     val paymentMethod: String,
     val customerName: String = "",
+    val customerEmail: String = "",
     val customerPhone: String = "",
     val orderDate: Long = System.currentTimeMillis(),
     val status: Int = 0, // -1=Đã hủy, 0=Đã đặt, 1=Đang xử lý, 2=Đang giao, 3=Đã giao
@@ -45,5 +46,9 @@ class OrderRepository(context: Context) {
         val json = prefs.getString("orders", null) ?: return emptyList()
         val type = object : TypeToken<List<Order>>() {}.type
         return gson.fromJson(json, type)
+    }
+
+    fun clearLocalOrders() {
+        prefs.edit().remove("orders").apply()
     }
 }

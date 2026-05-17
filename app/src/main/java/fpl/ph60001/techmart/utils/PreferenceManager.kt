@@ -77,4 +77,13 @@ class PreferenceManager(context: Context) {
     fun getShippingProvince(): String = sharedPreferences.getString("shipping_province", "") ?: ""
     fun getShippingWard(): String = sharedPreferences.getString("shipping_ward", "") ?: ""
     fun getShippingAddressDetail(): String = sharedPreferences.getString("shipping_address_detail", "") ?: ""
+
+    // --- Lưu avatar ---
+    fun saveAvatar(uri: String) {
+        sharedPreferences.edit().putString("user_avatar", uri).apply()
+    }
+
+    fun getAvatar(): String? {
+        return sharedPreferences.getString("user_avatar", null)
+    }
 }

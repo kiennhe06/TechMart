@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,6 +61,14 @@ fun CheckoutScreen(
 
     var selectedPayment by remember { mutableIntStateOf(0) }
     var isShippingCollapsed by remember { mutableStateOf(prefManager.getShippingName().isNotBlank() && prefManager.getShippingPhone().isNotBlank()) }
+
+    var cardNumber by remember { mutableStateOf("") }
+    var cardName by remember { mutableStateOf("") }
+    var cardExpiry by remember { mutableStateOf("") }
+    var cardCvv by remember { mutableStateOf("") }
+
+    var isProcessingPayment by remember { mutableStateOf(false) }
+    var paymentStepText by remember { mutableStateOf("") }
 
     // Thông tin giao hàng - auto-fill từ lần trước
     var fullName by remember { mutableStateOf(prefManager.getShippingName()) }
@@ -132,9 +141,16 @@ fun CheckoutScreen(
     val fmtTotal = String.format("%,dđ", total).replace(",", ".")
 
     // Kiểm tra form hợp lệ
+    val isCardValid = if (selectedPayment == 2) {
+        cardNumber.replace(" ", "").length == 16 &&
+                cardName.isNotBlank() &&
+                cardExpiry.matches(Regex("^(0[1-9]|1[0-2])/[0-9]{2}$")) &&
+                cardCvv.length == 3
+    } else true
+
     val isFormValid = fullName.isNotBlank() && isValidPhone(phone) &&
             selectedProvince != null && selectedWard != null &&
-            addressDetail.isNotBlank() && cartItems.isNotEmpty()
+            addressDetail.isNotBlank() && cartItems.isNotEmpty() && isCardValid
 
     Scaffold(
         topBar = {
@@ -149,10 +165,21 @@ fun CheckoutScreen(
             )
         },
         bottomBar = {
-            val paymentLabels = listOf("Thanh toán khi nhận hàng (COD)", "Chuyển khoản ngân hàng", "Ví điện tử")
+            val paymentLabels = listOf("Thanh toán khi nhận hàng (COD)", "Chuyển khoản ngân hàng", "Thẻ tín dụng / Ghi nợ")
             CheckoutBottomBar(total = fmtTotal, enabled = isFormValid, onPlaceOrder = {
                 scope.launch {
                     try {
+                        if (selectedPayment > 0) {
+                            isProcessingPayment = true
+                            val gateway = if (selectedPayment == 1) "Techcombank" else "Visa/Mastercard"
+                            paymentStepText = "Đang kết nối cổng thanh toán $gateway..."
+                            kotlinx.coroutines.delay(1200)
+                            paymentStepText = "Đang xác thực giao dịch & số dư..."
+                            kotlinx.coroutines.delay(1200)
+                            paymentStepText = "Xác thực thành công! Đang đồng bộ hóa hóa đơn..."
+                            kotlinx.coroutines.delay(800)
+                        }
+                        
                         val address = "$addressDetail, ${selectedWard?.name ?: ""}, ${selectedProvince?.name ?: ""}"
                         val payment = paymentLabels.getOrElse(selectedPayment) { paymentLabels[0] }
                         val orderItems = cartItems.map { OrderItem(it.name, it.price, it.image, it.quantity) }
@@ -164,6 +191,7 @@ fun CheckoutScreen(
                             address = address,
                             paymentMethod = payment,
                             customerName = fullName,
+                            customerEmail = prefManager.getSavedEmail() ?: "",
                             customerPhone = phone
                         )
 
@@ -182,12 +210,19 @@ fun CheckoutScreen(
                             
                             val itemCount = cartItems.sumOf { it.quantity }
                             cartViewModel.clearCart()
+                            
+                            if (selectedPayment > 0) {
+                                paymentStepText = "Đặt hàng thành công!"
+                                kotlinx.coroutines.delay(600)
+                            }
+                            isProcessingPayment = false
                             onNavigateToConfirmation(fmtTotal, address, payment, itemCount)
                         } else {
-                            // Xử lý lỗi server (ví dụ hết hàng)
+                            isProcessingPayment = false
                             android.widget.Toast.makeText(context, "Lỗi đặt hàng: ${response.message()}", android.widget.Toast.LENGTH_LONG).show()
                         }
                     } catch (e: Exception) {
+                        isProcessingPayment = false
                         android.widget.Toast.makeText(context, "Lỗi kết nối server: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
@@ -195,6 +230,46 @@ fun CheckoutScreen(
         },
         containerColor = TechDark
     ) { padding ->
+        if (isProcessingPayment) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = {},
+                properties = androidx.compose.ui.window.DialogProperties(
+                    dismissOnBackPress = false,
+                    dismissOnClickOutside = false
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(280.dp, 200.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(TechSlate)
+                        .border(1.5.dp, BluePrimary.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = BluePrimary,
+                            strokeWidth = 4.dp,
+                            modifier = Modifier.size(50.dp)
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = paymentStepText,
+                            color = WhitePure,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            }
+        }
+
         Column(
             modifier = Modifier.fillMaxSize().padding(padding)
                 .verticalScroll(rememberScrollState()).padding(16.dp),
@@ -403,9 +478,26 @@ fun CheckoutScreen(
             SectionCard(Icons.Default.Payment, "Phương thức thanh toán") {
                 PaymentOption(Icons.Default.Money, "Thanh toán khi nhận hàng (COD)", selectedPayment == 0) { selectedPayment = 0 }
                 Spacer(Modifier.height(8.dp))
+                
                 PaymentOption(Icons.Default.AccountBalance, "Chuyển khoản ngân hàng", selectedPayment == 1) { selectedPayment = 1 }
+                if (selectedPayment == 1) {
+                    BankTransferDetails(fmtTotal, phone)
+                }
                 Spacer(Modifier.height(8.dp))
+                
                 PaymentOption(Icons.Default.CreditCard, "Thẻ tín dụng / Ghi nợ", selectedPayment == 2) { selectedPayment = 2 }
+                if (selectedPayment == 2) {
+                    CreditCardForm(
+                        cardNumber = cardNumber,
+                        onCardNumberChange = { cardNumber = it },
+                        cardName = cardName,
+                        onCardNameChange = { cardName = it },
+                        cardExpiry = cardExpiry,
+                        onCardExpiryChange = { cardExpiry = it },
+                        cardCvv = cardCvv,
+                        onCardCvvChange = { cardCvv = it }
+                    )
+                }
             }
 
             // === 4. CHI TIẾT THANH TOÁN ===
@@ -507,3 +599,268 @@ private fun tfColors() = OutlinedTextFieldDefaults.colors(
     disabledTextColor = TechGray, disabledBorderColor = TechDark.copy(0.5f), disabledLabelColor = TechGray.copy(0.5f),
     errorBorderColor = ErrorRed, errorLabelColor = ErrorRed
 )
+
+@Composable
+private fun CreditCardPreview(
+    cardNumber: String,
+    cardName: String,
+    cardExpiry: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364))
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+            .padding(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp, 28.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFFE5A93B), Color(0xFFFFF2A3))
+                            )
+                        )
+                )
+                Text(
+                    text = "VISA",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 20.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
+            
+            val displayNum = cardNumber.padEnd(16, '•')
+                .chunked(4)
+                .joinToString("   ")
+            
+            Text(
+                text = displayNum,
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp
+            )
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("CHỦ THẺ", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                    Text(
+                        text = cardName.ifBlank { "NO NAME" }.uppercase(),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("HẠN DÙNG", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                    Text(
+                        text = cardExpiry.ifBlank { "MM/YY" },
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreditCardForm(
+    cardNumber: String,
+    onCardNumberChange: (String) -> Unit,
+    cardName: String,
+    onCardNameChange: (String) -> Unit,
+    cardExpiry: String,
+    onCardExpiryChange: (String) -> Unit,
+    cardCvv: String,
+    onCardCvvChange: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 8.dp)
+    ) {
+        CreditCardPreview(cardNumber, cardName, cardExpiry)
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = cardNumber,
+            onValueChange = { input ->
+                val filtered = input.filter { it.isDigit() }.take(16)
+                onCardNumberChange(filtered)
+            },
+            label = { Text("Số thẻ (16 chữ số)") },
+            leadingIcon = { Icon(Icons.Default.CreditCard, null, tint = BluePrimary) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            colors = tfColors(),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Spacer(Modifier.height(8.dp))
+        
+        OutlinedTextField(
+            value = cardName,
+            onValueChange = { onCardNameChange(it.take(30)) },
+            label = { Text("Họ tên chủ thẻ") },
+            leadingIcon = { Icon(Icons.Default.Person, null, tint = BluePrimary) },
+            colors = tfColors(),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+        Spacer(Modifier.height(8.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(
+                value = cardExpiry,
+                onValueChange = { input ->
+                    val filtered = input.replace("/", "").filter { it.isDigit() }.take(4)
+                    val formatted = if (filtered.length >= 3) {
+                        filtered.substring(0, 2) + "/" + filtered.substring(2)
+                    } else {
+                        filtered
+                    }
+                    onCardExpiryChange(formatted)
+                },
+                label = { Text("Hạn dùng (MM/YY)") },
+                leadingIcon = { Icon(Icons.Default.DateRange, null, tint = BluePrimary) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = tfColors(),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+            
+            OutlinedTextField(
+                value = cardCvv,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }.take(3)
+                    onCardCvvChange(filtered)
+                },
+                label = { Text("Mã CVV (3 số)") },
+                leadingIcon = { Icon(Icons.Default.Lock, null, tint = BluePrimary) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = tfColors(),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun BankTransferDetails(totalAmount: String, userPhone: String) {
+    val context = LocalContext.current
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val accountNumber = "99999999990203"
+    val transferContent = "TM ${userPhone.takeLast(6)}"
+    
+    val amountRaw = totalAmount.replace("[^\\d]".toRegex(), "")
+    val transferContentEncoded = try {
+        java.net.URLEncoder.encode(transferContent, "UTF-8")
+    } catch (e: Exception) {
+        transferContent
+    }
+    
+    val qrUrl = "https://img.vietqr.io/image/tcb-99999999990203-qr_only.png?amount=$amountRaw&addInfo=$transferContentEncoded&accountName=PHAM%20DUC%20KIEN"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(TechDark)
+            .border(1.dp, BluePrimary.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(160.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = qrUrl,
+                contentDescription = "VietQR",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        
+        Spacer(Modifier.height(12.dp))
+        Text("QUÉT MÃ QR ĐỂ THANH TOÁN CHUYỂN KHOẢN", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+        
+        BankInfoRow("Ngân hàng", "Techcombank")
+        BankInfoRow("Chủ tài khoản", "PHAM DUC KIEN")
+        BankInfoRow("Số tài khoản", accountNumber) {
+            clipboardManager.setText(AnnotatedString(accountNumber))
+            android.widget.Toast.makeText(context, "Đã sao chép số tài khoản", android.widget.Toast.LENGTH_SHORT).show()
+        }
+        BankInfoRow("Số tiền", totalAmount) {
+            val amountRaw = totalAmount.replace("[^\\d]".toRegex(), "")
+            clipboardManager.setText(AnnotatedString(amountRaw))
+            android.widget.Toast.makeText(context, "Đã sao chép số tiền", android.widget.Toast.LENGTH_SHORT).show()
+        }
+        BankInfoRow("Nội dung CK", transferContent) {
+            clipboardManager.setText(AnnotatedString(transferContent))
+            android.widget.Toast.makeText(context, "Đã sao chép nội dung chuyển khoản", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+@Composable
+private fun BankInfoRow(label: String, value: String, onCopy: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = TechGray, fontSize = 13.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(value, color = WhitePure, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            if (onCopy != null) {
+                Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = "Copy",
+                    tint = BluePrimary,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable { onCopy() }
+                )
+            }
+        }
+    }
+}
