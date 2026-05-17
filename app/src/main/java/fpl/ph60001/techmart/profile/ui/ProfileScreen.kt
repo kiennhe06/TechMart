@@ -32,7 +32,10 @@ import kotlin.text.uppercase
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit,
-    onFavoriteClick: () -> Unit = {}
+    onFavoriteClick: () -> Unit = {},
+    onPersonalInfoClick: () -> Unit = {},
+    onOrderHistoryClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {}
 ) {
     val user = Firebase.auth.currentUser
 
@@ -96,10 +99,10 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Profile Options
-            ProfileOptionItem(icon = Icons.Default.Person, title = "Thông tin cá nhân")
-            ProfileOptionItem(icon = Icons.Default.History, title = "Lịch sử mua hàng")
+            ProfileOptionItem(icon = Icons.Default.Person, title = "Thông tin cá nhân", onClick = onPersonalInfoClick)
+            ProfileOptionItem(icon = Icons.Default.History, title = "Lịch sử mua hàng", onClick = onOrderHistoryClick)
             ProfileOptionItem(icon = Icons.Default.Favorite, title = "Sản phẩm yêu thích", onClick = onFavoriteClick)
-            ProfileOptionItem(icon = Icons.Default.Settings, title = "Cài đặt")
+            ProfileOptionItem(icon = Icons.Default.Settings, title = "Cài đặt", onClick = onSettingsClick)
 
             Spacer(modifier = Modifier.weight(1f))
 

@@ -42,6 +42,8 @@ import fpl.ph60001.techmart.auth.ui.RegisterScreen
 import fpl.ph60001.techmart.auth.ui.SplashScreen
 import fpl.ph60001.techmart.home.ui.HomeScreen
 import fpl.ph60001.techmart.profile.ui.ProfileScreen
+import fpl.ph60001.techmart.profile.ui.PersonalInfoScreen
+import fpl.ph60001.techmart.profile.ui.SettingsScreen
 import fpl.ph60001.techmart.product.ui.ProductDetailScreen
 import fpl.ph60001.techmart.product.ui.FavoriteScreen
 import fpl.ph60001.techmart.product.ui.AllProductsScreen
@@ -374,8 +376,23 @@ fun TechMartApp(callbackManager: CallbackManager) {
                     },
                     onFavoriteClick = {
                         navController.navigate("favorites")
+                    },
+                    onPersonalInfoClick = {
+                        navController.navigate("personal_info")
+                    },
+                    onOrderHistoryClick = {
+                        navController.navigate("orders")
+                    },
+                    onSettingsClick = {
+                        navController.navigate("settings")
                     }
                 )
+            }
+            composable("personal_info") {
+                PersonalInfoScreen(onBackClick = { navController.popBackStack() })
+            }
+            composable("settings") {
+                SettingsScreen(onBackClick = { navController.popBackStack() })
             }
             composable("favorites") {
                 FavoriteScreen(

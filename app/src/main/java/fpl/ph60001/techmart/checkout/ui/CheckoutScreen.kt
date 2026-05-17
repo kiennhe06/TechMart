@@ -38,6 +38,7 @@ import fpl.ph60001.techmart.order.Order
 import fpl.ph60001.techmart.order.OrderItem
 import fpl.ph60001.techmart.order.OrderRepository
 import kotlinx.coroutines.launch
+import androidx.compose.ui.window.PopupProperties
 
 // Kiểm tra số điện thoại Việt Nam hợp lệ
 private fun isValidPhone(phone: String): Boolean {
@@ -250,12 +251,12 @@ fun CheckoutScreen(
                 )
                 Spacer(Modifier.height(8.dp))
 
-                // Gõ tìm Tỉnh/Thành phố
+                 // Gõ tìm Tỉnh/Thành phố
                 val filteredProvinces = remember(provinceQuery, provinces) {
                     if (provinceQuery.isBlank() || provinceQuery == selectedProvince?.name) provinces
                     else provinces.filter { it.name.contains(provinceQuery, ignoreCase = true) }
                 }
-                ExposedDropdownMenuBox(expanded = expandedProvince, onExpandedChange = { if (!isLoadingProvinces) expandedProvince = it }) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = provinceQuery,
                         onValueChange = { provinceQuery = it; selectedProvince = null; selectedWard = null; expandedProvince = true },
@@ -281,32 +282,32 @@ fun CheckoutScreen(
                             }
                         },
                         leadingIcon = { Icon(Icons.Default.LocationCity, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                     )
-                    ExposedDropdownMenu(
+                    DropdownMenu(
                         expanded = filteredProvinces.isNotEmpty() && expandedProvince, 
                         onDismissRequest = { expandedProvince = false }, 
-                        modifier = Modifier.exposedDropdownSize(), 
-                        containerColor = TechSlate
+                        properties = PopupProperties(focusable = false),
+                        modifier = Modifier.fillMaxWidth(0.9f).background(TechSlate)
                     ) {
-                            filteredProvinces.forEach { province ->
-                                DropdownMenuItem(text = { Text(province.name, color = WhitePure) }, onClick = {
-                                    selectedProvince = province; provinceQuery = province.name
-                                    selectedWard = null; wardQuery = ""
-                                    wards = emptyList()
-                                    expandedProvince = false
-                                    scope.launch {
-                                        isLoadingWards = true
-                                        try { 
-                                            wards = (RetrofitClient.locationApiService.getWardsByProvince(province.code)).wards ?: emptyList() 
-                                            if (wards.isNotEmpty()) expandedWard = true
-                                        }
-                                        catch (_: Exception) {} finally { isLoadingWards = false }
+                        filteredProvinces.forEach { province ->
+                            DropdownMenuItem(text = { Text(province.name, color = WhitePure) }, onClick = {
+                                selectedProvince = province; provinceQuery = province.name
+                                selectedWard = null; wardQuery = ""
+                                wards = emptyList()
+                                expandedProvince = false
+                                scope.launch {
+                                    isLoadingWards = true
+                                    try { 
+                                        wards = (RetrofitClient.locationApiService.getWardsByProvince(province.code)).wards ?: emptyList() 
+                                        if (wards.isNotEmpty()) expandedWard = true
                                     }
-                                })
-                            }
+                                    catch (_: Exception) {} finally { isLoadingWards = false }
+                                }
+                            })
                         }
                     }
+                }
                 Spacer(Modifier.height(8.dp))
 
                 // Gõ tìm Phường/Xã
@@ -314,7 +315,7 @@ fun CheckoutScreen(
                     if (wardQuery.isBlank() || wardQuery == selectedWard?.name) wards
                     else wards.filter { it.name.contains(wardQuery, ignoreCase = true) }
                 }
-                ExposedDropdownMenuBox(expanded = expandedWard, onExpandedChange = { if (selectedProvince != null && !isLoadingWards) expandedWard = it }) {
+                Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = wardQuery,
                         onValueChange = { wardQuery = it; selectedWard = null; expandedWard = true },
@@ -341,13 +342,13 @@ fun CheckoutScreen(
                         },
                         leadingIcon = { Icon(Icons.Default.Place, null, tint = TechGray, modifier = Modifier.size(20.dp)) },
                         enabled = selectedProvince != null,
-                        modifier = Modifier.fillMaxWidth().menuAnchor(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier.fillMaxWidth(), colors = tfColors(), shape = RoundedCornerShape(12.dp)
                     )
-                    ExposedDropdownMenu(
+                    DropdownMenu(
                         expanded = filteredWards.isNotEmpty() && expandedWard, 
                         onDismissRequest = { expandedWard = false }, 
-                        modifier = Modifier.exposedDropdownSize(), 
-                        containerColor = TechSlate
+                        properties = PopupProperties(focusable = false),
+                        modifier = Modifier.fillMaxWidth(0.9f).background(TechSlate)
                     ) {
                         filteredWards.forEach { ward ->
                             DropdownMenuItem(text = { Text(ward.name, color = WhitePure) }, onClick = {
