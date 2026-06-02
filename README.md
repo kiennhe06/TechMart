@@ -13,8 +13,9 @@ TechMart là ứng dụng Android chuyên dùng để mua bán các thiết bị
 * Phần Flash Sale có đồng hồ đếm ngược thời gian thực và thanh hiển thị số lượng sản phẩm đã bán.
 * Hỗ trợ tìm kiếm nhanh sản phẩm theo tên.
 
-![Màn hình Trang chủ](<img width="1080" height="2400" alt="TrangChu" src="https://github.com/user-attachments/assets/71a104e7-0185-4457-aacb-d1af9f8d0b31" />
-)
+![Màn hình Trang chủ](
+![Uploading TrangChu.png…]())
+
 
 ### 2. Xem chi tiết & Yêu thích
 * Xem thông tin chi tiết, mô tả dài và danh sách thông số kỹ thuật (RAM, bộ nhớ, pin...).
