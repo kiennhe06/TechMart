@@ -1,54 +1,63 @@
-# TechMart - Ứng dụng Thương mại Điện tử Hiện đại 🚀
+# TechMart - Ứng ứng di động mua sắm đồ công nghệ
 
-TechMart là một ứng dụng Android mua sắm thiết bị công nghệ được xây dựng với công nghệ tiên tiến nhất, mang lại trải nghiệm mượt mà, giao diện "Premium" và các tính năng đầy đủ của một sàn thương mại điện tử.
+TechMart là ứng dụng Android chuyên dùng để mua bán các thiết bị công nghệ (điện thoại, laptop, phụ kiện). Dự án này được thiết kế theo phong cách giao diện tối (dark mode) hiện đại và tích hợp đầy đủ quy trình mua sắm từ xem sản phẩm, giỏ hàng, thanh toán cho đến theo dõi đơn hàng và đánh giá.
 
-## 📱 Tính năng chính
+⚠️ **Lưu ý**: Để ứng dụng chạy đầy đủ dữ liệu và chức năng, bạn cần khởi chạy máy chủ backend tại:
+👉 **Mã nguồn Backend & Web Admin**: "https://github.com/kiennhe06/tech-mart-backend"
+---
 
-### 1. Phía Người dùng (Android App)
-*   **Trang chủ (Home):** Banner động, danh mục sản phẩm, Flash Sale với thanh tiến trình bán hàng và danh sách sản phẩm gợi ý.
-*   **Chi tiết sản phẩm:** Xem thông tin chi tiết, mô tả và thông số kỹ thuật tùy chỉnh từ Admin.
-*   **Hệ thống Yêu thích (Wishlist):** Thả tym để lưu sản phẩm vào danh sách yêu thích. Dữ liệu được lưu trữ vĩnh viễn trên máy.
-*   **Giỏ hàng (Shopping Cart):** Thêm sản phẩm, tăng/giảm số lượng, xóa sản phẩm và tính tổng tiền tự động.
-*   **Hồ sơ người dùng:** Quản lý thông tin cá nhân và truy cập nhanh danh sách yêu thích.
-*   **Tìm kiếm:** Tìm kiếm sản phẩm thông minh.
+## 📱 Các tính năng nổi bật của App
 
-### 2. Phía Quản trị (Admin Web Panel)
-*   **Quản lý sản phẩm:** Thêm, Sửa, Xóa sản phẩm trực quan trên nền tảng Web.
-*   **Thông số kỹ thuật:** Tự tay nhập các thông số chi tiết (RAM, CPU, Pin...) cho từng sản phẩm.
-*   **Giao diện Glassmorphism:** Thiết kế hiện đại, sang trọng với hiệu ứng kính mờ.
+### 1. Mua sắm & Flash Sale
+* Giao diện trang chủ hiển thị danh sách banner và danh mục sản phẩm.
+* Phần Flash Sale có đồng hồ đếm ngược thời gian thực và thanh hiển thị số lượng sản phẩm đã bán.
+* Hỗ trợ tìm kiếm nhanh sản phẩm theo tên.
 
-## 🛠 Công nghệ sử dụng
+![Màn hình Trang chủ](images/home_screen.png)
 
-### Android (Mobile)
-*   **Language:** Kotlin
-*   **UI Framework:** Jetpack Compose (Modern UI)
-*   **Architecture:** MVVM (Model-View-ViewModel)
-*   **Networking:** Retrofit & OkHttp
-*   **Image Loading:** Coil
-*   **Local Storage:** SharedPreferences + Gson (Lưu trữ giỏ hàng và yêu thích vĩnh viễn)
-*   **Navigation:** Jetpack Compose Navigation
+### 2. Xem chi tiết & Yêu thích
+* Xem thông tin chi tiết, mô tả dài và danh sách thông số kỹ thuật (RAM, bộ nhớ, pin...).
+* Thả tim (yêu thích) để lưu sản phẩm vào danh sách riêng, dữ liệu được lưu trên máy nên không bị mất khi tắt app.
 
-### Backend (Server)
-*   **Platform:** Node.js & Express
-*   **Database:** JSON-based database (Dễ dàng di chuyển và quản lý)
-*   **View Engine:** EJS
+![Màn hình Chi tiết sản phẩm](images/detail_screen.png)
 
-## 🚀 Hướng dẫn vận hành
+### 3. Giỏ hàng & Thanh toán tự động (VietQR + Thẻ VISA)
+* **Giỏ hàng**: Thêm, bớt số lượng, xóa sản phẩm và tự động tính tiền.
+* **Chọn địa chỉ**: Chọn nhanh Tỉnh/Thành, Quận/Huyện, Xã/Phường bằng menu chọn tự động.
+* **Thanh toán bằng Thẻ**: Nhập thông tin thẻ VISA trực quan, các thông tin sẽ hiển thị trực tiếp lên hình thẻ ảo 3D trên màn hình khi gõ.
+* **Thanh toán VietQR**: Tự động sinh mã QR chuyển khoản chứa sẵn số tiền đơn hàng, thông tin tài khoản ngân hàng nhận tiền (`PHAM DUC KIEN` - Techcombank) và nội dung chuyển khoản động.
+* **Mô phỏng giao dịch**: Hiển thị quá trình xử lý đơn hàng theo các bước bảo mật.
 
-### 1. Khởi chạy Backend
-1. Mở thư mục `techMartBackend`.
-2. Chạy lệnh: `npm install` để cài đặt thư viện.
-3. Chạy lệnh: `npm start` để khởi động server tại cổng `3000`.
+![Màn hình Thanh toán](images/checkout_screen.png)
 
-### 2. Khởi chạy Android App
-1. Mở dự án trong Android Studio.
-2. Đảm bảo Emulator của bạn có quyền truy cập Internet.
-3. Địa chỉ IP kết nối mặc định: `http://10.0.2.2:3000` (Địa chỉ chuẩn để Emulator truy cập Localhost).
-4. Nhấn **Run** và trải nghiệm!
+### 4. Quản lý đơn hàng & Đánh giá
+* Xem lại lịch sử các đơn hàng đã đặt.
+* Theo dõi trạng thái đơn hàng (đang xử lý, đang giao, đã giao, đã hủy).
+* Cho phép đánh giá số sao (1-5 sao) kèm bình luận nhận xét sau khi nhận hàng thành công.
 
-## 📸 Giao diện ứng dụng
-*(Bạn có thể tự chụp ảnh màn hình và thêm vào thư mục `screenshots` để README thêm sinh động nhé!)*
+![Màn hình Lịch sử đơn hàng](images/order_history.png)
+
+### 5. Tài khoản cá nhân & Đăng nhập mạng xã hội (Firebase)
+* **Đăng nhập truyền thống**: Đăng ký và đăng nhập nhanh bằng tài khoản Email và Mật khẩu cá nhân.
+* **⚡ Đăng nhập một chạm (Social Login)**: Tích hợp nền tảng đám mây **Firebase** cho phép người dùng đăng nhập tức thì thông qua tài khoản **Google** và **Facebook** cực kỳ bảo mật và tiện lợi mà không cần ghi nhớ mật khẩu.
+* **Cá nhân hóa hồ sơ**: Cập nhật trực tiếp họ tên hiển thị, số điện thoại giao hàng và hỗ trợ tải lên để thay đổi ảnh đại diện (avatar) cá nhân.
+
+![Màn hình Cá nhân](images/profile_screen.png)
 
 ---
-**Phát triển bởi:** Team TechMart
-**Trạng thái dự án:** Đang hoàn thiện các tính năng nâng cao.
+
+## 🛠️ Hướng dẫn cài đặt và chạy thử
+
+### 1. Chuẩn bị
+* Phần mềm Android Studio bản mới nhất.
+* Thiết bị chạy: máy ảo Android (Emulator) hoặc điện thoại Android thật.
+* Server Backend (nằm trong thư mục `techMartBackend`) đã khởi động thành công.
+
+### 2. Cách chạy App
+1. Mở thư mục `TechMart` này bằng Android Studio.
+2. Đợi phần mềm đồng bộ (Gradle sync) hoàn tất.
+3. Cấu hình IP kết nối server:
+   * Mở file `RetrofitClient.kt` trong thư mục `network`.
+   * Nếu dùng máy ảo Android Studio, giữ nguyên IP `"http://10.0.2.2:3000/"`.
+   * Nếu dùng điện thoại thật, đổi thành IP Wi-Fi của máy tính bạn (ví dụ: `"http://192.168.1.15:3000/"`) và kết nối điện thoại chung Wi-Fi với máy tính.
+4. Nhấn biểu tượng nút **Run** (mũi tên màu xanh) trong Android Studio để cài đặt và chạy app.
