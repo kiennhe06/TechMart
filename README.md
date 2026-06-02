@@ -1,4 +1,4 @@
-# TechMart - Ứng ứng di động mua sắm đồ công nghệ
+ TechMart - Ứng ứng di động mua sắm đồ công nghệ
 
 TechMart là ứng dụng Android chuyên dùng để mua bán các thiết bị công nghệ (điện thoại, laptop, phụ kiện). Dự án này được thiết kế theo phong cách giao diện tối (dark mode) hiện đại và tích hợp đầy đủ quy trình mua sắm từ xem sản phẩm, giỏ hàng, thanh toán cho đến theo dõi đơn hàng và đánh giá.
 
@@ -12,17 +12,11 @@ TechMart là ứng dụng Android chuyên dùng để mua bán các thiết bị
 * Giao diện trang chủ hiển thị danh sách banner và danh mục sản phẩm.
 * Phần Flash Sale có đồng hồ đếm ngược thời gian thực và thanh hiển thị số lượng sản phẩm đã bán.
 * Hỗ trợ tìm kiếm nhanh sản phẩm theo tên.
-
-![Màn hình Trang chủ](
-![Uploading TrangChu.png…]())
-
-
+* 
 ### 2. Xem chi tiết & Yêu thích
 * Xem thông tin chi tiết, mô tả dài và danh sách thông số kỹ thuật (RAM, bộ nhớ, pin...).
 * Thả tim (yêu thích) để lưu sản phẩm vào danh sách riêng, dữ liệu được lưu trên máy nên không bị mất khi tắt app.
-
-![Màn hình Chi tiết sản phẩm](images/detail_screen.png)
-
+  
 ### 3. Giỏ hàng & Thanh toán tự động (VietQR + Thẻ VISA)
 * **Giỏ hàng**: Thêm, bớt số lượng, xóa sản phẩm và tự động tính tiền.
 * **Chọn địa chỉ**: Chọn nhanh Tỉnh/Thành, Quận/Huyện, Xã/Phường bằng menu chọn tự động.
@@ -30,22 +24,15 @@ TechMart là ứng dụng Android chuyên dùng để mua bán các thiết bị
 * **Thanh toán VietQR**: Tự động sinh mã QR chuyển khoản chứa sẵn số tiền đơn hàng, thông tin tài khoản ngân hàng nhận tiền (`PHAM DUC KIEN` - Techcombank) và nội dung chuyển khoản động.
 * **Mô phỏng giao dịch**: Hiển thị quá trình xử lý đơn hàng theo các bước bảo mật.
 
-![Màn hình Thanh toán](images/checkout_screen.png)
-
 ### 4. Quản lý đơn hàng & Đánh giá
 * Xem lại lịch sử các đơn hàng đã đặt.
 * Theo dõi trạng thái đơn hàng (đang xử lý, đang giao, đã giao, đã hủy).
 * Cho phép đánh giá số sao (1-5 sao) kèm bình luận nhận xét sau khi nhận hàng thành công.
 
-![Màn hình Lịch sử đơn hàng](images/order_history.png)
-
 ### 5. Tài khoản cá nhân & Đăng nhập mạng xã hội (Firebase)
 * **Đăng nhập truyền thống**: Đăng ký và đăng nhập nhanh bằng tài khoản Email và Mật khẩu cá nhân.
 * **⚡ Đăng nhập một chạm (Social Login)**: Tích hợp nền tảng đám mây **Firebase** cho phép người dùng đăng nhập tức thì thông qua tài khoản **Google** và **Facebook** cực kỳ bảo mật và tiện lợi mà không cần ghi nhớ mật khẩu.
 * **Cá nhân hóa hồ sơ**: Cập nhật trực tiếp họ tên hiển thị, số điện thoại giao hàng và hỗ trợ tải lên để thay đổi ảnh đại diện (avatar) cá nhân.
-
-![Màn hình Cá nhân](images/profile_screen.png)
-
 ---
 
 ## 🛠️ Hướng dẫn cài đặt và chạy thử
